@@ -27,7 +27,7 @@ func main() {
 	fs := http.FileServer(http.Dir("./static"))
 	http.Handle("/", fs)
 
-	port := ":8080" // Go будет работать прямо на стандартном порту сайта
+	port := ":80" // Go будет работать прямо на стандартном порту сайта
 	fmt.Printf("Сервер запущен на http://localhost%s\n", port)
 	fmt.Println("Для теста отправьте GET запрос на http://localhost/ping")
 
