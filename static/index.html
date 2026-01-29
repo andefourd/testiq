@@ -1,0 +1,103 @@
+cat <<EOF>
+	/var/www/html/index.html
+	<!doctype html>
+	<html lang="ru">
+		<head>
+			<meta charset="UTF-8" />
+			<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+			<title>Клик-счетчик</title>
+			<style>
+				body {
+					font-family: 'Segoe UI', sans-serif;
+					display: flex;
+					justify-content: center;
+					align-items: center;
+					height: 100vh;
+					margin: 0;
+					background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+					color: white;
+				}
+				.container {
+					text-align: center;
+					background: rgba(255, 255, 255, 0.1);
+					padding: 50px;
+					border-radius: 20px;
+					backdrop-filter: blur(10px);
+					box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+					border: 1px solid rgba(255, 255, 255, 0.2);
+				}
+				h1 {
+					font-size: 2rem;
+					margin-bottom: 20px;
+				}
+				#counter {
+					font-size: 5rem;
+					font-weight: bold;
+					margin: 20px 0;
+					color: #00ffcc;
+					text-shadow: 0 0 20px rgba(0, 255, 204, 0.5);
+				}
+				button {
+					padding: 15px 40px;
+					font-size: 1.2rem;
+					cursor: pointer;
+					background-color: #00ffcc;
+					border: none;
+					border-radius: 50px;
+					color: #1e3c72;
+					font-weight: bold;
+					transition: all 0.3s ease;
+					box-shadow: 0 5px 15px rgba(0, 255, 204, 0.3);
+				}
+				button:hover {
+					transform: translateY(-3px);
+					box-shadow: 0 8px 20px rgba(0, 255, 204, 0.5);
+					background-color: #ffffff;
+				}
+				button:active {
+					transform: translateY(1px);
+				}
+				.reset {
+					margin-top: 20px;
+					font-size: 0.9rem;
+					opacity: 0.6;
+					cursor: pointer;
+					text-decoration: underline;
+				}
+			</style>
+		</head>
+		<body>
+			<div class="container">
+				<h1>Счетчик нажатий</h1>
+				<div id="counter">0</div>
+				<button id="clickBtn">НАЖМИ МЕНЯ!</button>
+				<div class="reset" id="resetBtn">сбросить счетчик</div>
+			</div>
+
+			<script>
+				const counterDisplay = document.getElementById('counter')
+				const clickBtn = document.getElementById('clickBtn')
+				const resetBtn = document.getElementById('resetBtn')
+
+				// Загружаем значение из памяти браузера или ставим 0
+				let count = localStorage.getItem('myClicks') || 0
+				counterDisplay.textContent = count
+
+				// Обработка клика
+				clickBtn.addEventListener('click', () => {
+					count++
+					counterDisplay.textContent = count
+					localStorage.setItem('myClicks', count) // сохраняем
+				})
+
+				// Сброс
+				resetBtn.addEventListener('click', () => {
+					count = 0
+					counterDisplay.textContent = count
+					localStorage.setItem('myClicks', count)
+				})
+			</script>
+		</body>
+	</html>
+	EOF
+</EOF>
