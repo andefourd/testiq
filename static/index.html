@@ -1,103 +1,235 @@
-cat <<EOF>
-	/var/www/html/index.html
-	<!doctype html>
-	<html lang="ru">
-		<head>
-			<meta charset="UTF-8" />
-			<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-			<title>Клик-счетчик</title>
-			<style>
-				body {
-					font-family: 'Segoe UI', sans-serif;
-					display: flex;
-					justify-content: center;
-					align-items: center;
-					height: 100vh;
-					margin: 0;
-					background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-					color: white;
-				}
-				.container {
-					text-align: center;
-					background: rgba(255, 255, 255, 0.1);
-					padding: 50px;
-					border-radius: 20px;
-					backdrop-filter: blur(10px);
-					box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-					border: 1px solid rgba(255, 255, 255, 0.2);
-				}
-				h1 {
-					font-size: 2rem;
-					margin-bottom: 20px;
-				}
-				#counter {
-					font-size: 5rem;
-					font-weight: bold;
-					margin: 20px 0;
-					color: #00ffcc;
-					text-shadow: 0 0 20px rgba(0, 255, 204, 0.5);
-				}
-				button {
-					padding: 15px 40px;
-					font-size: 1.2rem;
-					cursor: pointer;
-					background-color: #00ffcc;
-					border: none;
-					border-radius: 50px;
-					color: #1e3c72;
-					font-weight: bold;
-					transition: all 0.3s ease;
-					box-shadow: 0 5px 15px rgba(0, 255, 204, 0.3);
-				}
-				button:hover {
-					transform: translateY(-3px);
-					box-shadow: 0 8px 20px rgba(0, 255, 204, 0.5);
-					background-color: #ffffff;
-				}
-				button:active {
-					transform: translateY(1px);
-				}
-				.reset {
-					margin-top: 20px;
-					font-size: 0.9rem;
-					opacity: 0.6;
-					cursor: pointer;
-					text-decoration: underline;
-				}
-			</style>
-		</head>
-		<body>
-			<div class="container">
-				<h1>Счетчик нажатий</h1>
-				<div id="counter">0</div>
+<!doctype html>
+<html lang="ru">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Клик-счетчик с серверным логированием</title>
+		<style>
+			body {
+				font-family: 'Segoe UI', sans-serif;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				height: 100vh;
+				margin: 0;
+				background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+				color: white;
+			}
+			.container {
+				text-align: center;
+				background: rgba(255, 255, 255, 0.1);
+				padding: 50px;
+				border-radius: 20px;
+				backdrop-filter: blur(10px);
+				box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+				border: 1px solid rgba(255, 255, 255, 0.2);
+				max-width: 600px;
+				width: 90%;
+			}
+			h1 {
+				font-size: 2rem;
+				margin-bottom: 20px;
+			}
+			#counter {
+				font-size: 5rem;
+				font-weight: bold;
+				margin: 20px 0;
+				color: #00ffcc;
+				text-shadow: 0 0 20px rgba(0, 255, 204, 0.5);
+				transition: all 0.3s ease;
+			}
+			button {
+				padding: 15px 40px;
+				font-size: 1.2rem;
+				cursor: pointer;
+				background-color: #00ffcc;
+				border: none;
+				border-radius: 50px;
+				color: #1e3c72;
+				font-weight: bold;
+				transition: all 0.3s ease;
+				box-shadow: 0 5px 15px rgba(0, 255, 204, 0.3);
+				margin: 10px;
+			}
+			button:hover {
+				transform: translateY(-3px);
+				box-shadow: 0 8px 20px rgba(0, 255, 204, 0.5);
+				background-color: #ffffff;
+			}
+			button:active {
+				transform: translateY(1px);
+			}
+			#resetBtn {
+				background-color: #ff3366;
+				color: white;
+			}
+			#resetBtn:hover {
+				background-color: #ff6699;
+			}
+			.status {
+				margin-top: 20px;
+				font-size: 0.9rem;
+				color: rgba(255, 255, 255, 0.7);
+				min-height: 20px;
+			}
+			.info {
+				margin-top: 30px;
+				padding: 15px;
+				background: rgba(0, 0, 0, 0.2);
+				border-radius: 10px;
+				font-size: 0.8rem;
+				text-align: left;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="container">
+			<h1>Серверный счетчик кликов</h1>
+			<div id="counter">0</div>
+			<div>
 				<button id="clickBtn">НАЖМИ МЕНЯ!</button>
-				<div class="reset" id="resetBtn">сбросить счетчик</div>
+				<button id="resetBtn">СБРОСИТЬ СЧЕТЧИК</button>
 			</div>
+			<div class="status" id="status"></div>
 
-			<script>
-				const counterDisplay = document.getElementById('counter')
-				const clickBtn = document.getElementById('clickBtn')
-				const resetBtn = document.getElementById('resetBtn')
+			<div class="info">
+				<h3>Как это работает:</h3>
+				<p>• Каждый клик отправляется на сервер</p>
+				<p>• Сервер логирует информацию о клике в консоль</p>
+				<p>• Счетчик хранится на сервере и общий для всех</p>
+				<p>• Проверьте консоль Go-сервера для просмотра логов</p>
+			</div>
+		</div>
 
-				// Загружаем значение из памяти браузера или ставим 0
-				let count = localStorage.getItem('myClicks') || 0
-				counterDisplay.textContent = count
+		<script>
+			const counterDisplay = document.getElementById('counter')
+			const clickBtn = document.getElementById('clickBtn')
+			const resetBtn = document.getElementById('resetBtn')
+			const statusDisplay = document.getElementById('status')
 
-				// Обработка клика
-				clickBtn.addEventListener('click', () => {
-					count++
-					counterDisplay.textContent = count
-					localStorage.setItem('myClicks', count) // сохраняем
+			// Функция для обновления счетчика с сервера
+			async function updateCounter() {
+				try {
+					// В реальном приложении здесь был бы GET запрос для получения текущего значения
+					// Но для простоты будем считать, что клиент знает текущее значение
+					// (в production нужно добавить эндпоинт GET /count)
+				} catch (error) {
+					showStatus('Ошибка при загрузке счетчика', 'error')
+				}
+			}
+
+			// Функция для отправки клика на сервер
+			async function sendClick() {
+				try {
+					const response = await fetch('/click', {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+						},
+					})
+
+					if (!response.ok) {
+						throw new Error(`HTTP error! status: ${response.status}`)
+					}
+
+					const data = await response.json()
+					counterDisplay.textContent = data.count
+
+					// Анимация клика
+					counterDisplay.style.transform = 'scale(1.2)'
+					counterDisplay.style.color = '#ff3366'
+					setTimeout(() => {
+						counterDisplay.style.transform = 'scale(1)'
+						counterDisplay.style.color = '#00ffcc'
+					}, 200)
+
+					showStatus(
+						`Клик зарегистрирован! Всего кликов: ${data.count}`,
+						'success',
+					)
+				} catch (error) {
+					showStatus('Ошибка при отправке клика: ' + error.message, 'error')
+					// Возвращаемся к локальному счетчику при ошибке
+					const current = parseInt(counterDisplay.textContent) || 0
+					counterDisplay.textContent = current + 1
+				}
+			}
+
+			// Функция для сброса счетчика
+			async function resetCounter() {
+				if (
+					!confirm(
+						'Вы уверены, что хотите сбросить счетчик? Это действие отобразится в логах сервера.',
+					)
+				) {
+					return
+				}
+
+				try {
+					const response = await fetch('/reset', {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+						},
+					})
+
+					if (!response.ok) {
+						throw new Error(`HTTP error! status: ${response.status}`)
+					}
+
+					const data = await response.json()
+					counterDisplay.textContent = data.new_count
+
+					showStatus(
+						`Счетчик сброшен! Было: ${data.old_count}, теперь: ${data.new_count}`,
+						'reset',
+					)
+				} catch (error) {
+					showStatus('Ошибка при сбросе счетчика: ' + error.message, 'error')
+				}
+			}
+
+			// Функция для показа статуса
+			function showStatus(message, type) {
+				statusDisplay.textContent = message
+				statusDisplay.style.color =
+					type === 'success'
+						? '#00ffcc'
+						: type === 'error'
+							? '#ff3366'
+							: type === 'reset'
+								? '#ffcc00'
+								: 'rgba(255, 255, 255, 0.7)'
+
+				// Автоочистка статуса через 5 секунд
+				setTimeout(() => {
+					if (statusDisplay.textContent === message) {
+						statusDisplay.textContent = ''
+					}
+				}, 5000)
+			}
+
+			// Привязываем обработчики
+			clickBtn.addEventListener('click', sendClick)
+			resetBtn.addEventListener('click', resetCounter)
+
+			// Инициализация
+			showStatus('Счетчик готов к работе! Нажмите кнопку выше.', 'info')
+
+			// Проверяем доступность сервера при загрузке
+			fetch('/ping')
+				.then(response => response.text())
+				.then(text => {
+					if (text === 'pong') {
+						showStatus('Сервер подключен. Можно кликать!', 'success')
+					}
 				})
-
-				// Сброс
-				resetBtn.addEventListener('click', () => {
-					count = 0
-					counterDisplay.textContent = count
-					localStorage.setItem('myClicks', count)
+				.catch(() => {
+					showStatus(
+						'Внимание: сервер недоступен. Клики будут работать только локально.',
+						'error',
+					)
 				})
-			</script>
-		</body>
-	</html>
-	EOF
-</EOF>
+		</script>
+	</body>
+</html>
