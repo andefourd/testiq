@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/vk"
@@ -24,7 +25,7 @@ var oauthConf = &oauth2.Config{
 	ClientSecret: clientSecret,
 	RedirectURL:  redirectURL,
 	Endpoint:     vk.Endpoint,                             // Встроенные эндпоинты VK: https://oauth.vk.com/authorize и https://oauth.vk.com/access_token
-	Scopes:       []string{"vkid.personal_info", "email"}, // Исправленные scopes для VK ID: базовая информация + email
+	Scopes:       []string{"vkid.personal_info", "email"}, // Scopes для VK ID: базовая информация + email
 }
 
 func main() {
@@ -44,7 +45,9 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 // Генерация URL для авторизации и редирект
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	state := "random-state-string" // Для защиты от CSRF, сгенерируйте случайно и проверьте в callback
-	url := oauthConf.AuthCodeURL(state)
+	// Используем запятую для разделения scopes, как требует VK ID
+	scopeParam := strings.Join(oauthConf.Scopes, ",")
+	url := oauthConf.AuthCodeURL(state, oauth2.SetAuthURLParam("scope", scopeParam))
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
 
@@ -72,8 +75,8 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Получаем данные пользователя (метод users.get)
 	params := api.Params{
-		"fields": "photo_200,first_name,last_name", // Поля: фото, имя, фамилия (из vkid.personal_info)
-		"v":      "5.199",                          // Версия API для совместимости
+		"fields": "photo_200,first_name,last_name,sex,bdate,city", // Поля из vkid.personal_info: фото, имя, фамилия, пол, дата рождения, город
+		"v":      "5.199",                                         // Версия API для совместимости
 	}
 	users, err := vkClient.UsersGet(params)
 	if err != nil {
