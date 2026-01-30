@@ -23,8 +23,8 @@ var oauthConf = &oauth2.Config{
 	ClientID:     clientID,
 	ClientSecret: clientSecret,
 	RedirectURL:  redirectURL,
-	Endpoint:     vk.Endpoint,       // Встроенные эндпоинты VK: https://oauth.vk.com/authorize и https://oauth.vk.com/access_token
-	Scopes:       []string{"email"}, // Опционально: добавьте scopes, если нужны (email, friends, photos и т.д.)
+	Endpoint:     vk.Endpoint,                             // Встроенные эндпоинты VK: https://oauth.vk.com/authorize и https://oauth.vk.com/access_token
+	Scopes:       []string{"vkid.personal_info", "email"}, // Исправленные scopes для VK ID: базовая информация + email
 }
 
 func main() {
@@ -63,12 +63,17 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Доступ к email (если scope=email): VK возвращает его в token.Extra
+	email := token.Extra("email")
+	userID := token.Extra("user_id")
+
 	// Создаем VK API клиент с token (используем vksdk для удобства)
 	vkClient := api.NewVK(token.AccessToken)
 
 	// Получаем данные пользователя (метод users.get)
 	params := api.Params{
-		"fields": "photo_200,first_name,last_name", // Поля: фото, имя, фамилия
+		"fields": "photo_200,first_name,last_name", // Поля: фото, имя, фамилия (из vkid.personal_info)
+		"v":      "5.199",                          // Версия API для совместимости
 	}
 	users, err := vkClient.UsersGet(params)
 	if err != nil {
@@ -78,5 +83,5 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Выводим данные (в реальности сохраните в сессии или БД)
 	userData, _ := json.Marshal(users)
-	fmt.Fprintf(w, "Успешная авторизация! Данные пользователя: %s\nAccess Token: %s", userData, token.AccessToken)
+	fmt.Fprintf(w, "Успешная авторизация! Данные пользователя: %s\nEmail: %v\nUser ID: %v\nAccess Token: %s", userData, email, userID, token.AccessToken)
 }
