@@ -16,11 +16,11 @@ import (
 )
 
 const (
-	clientID     = "54437079"             // Ваш app ID
-	clientSecret = "QS0LGDdzhwgEVatG20m8" // Замените на client_secret
+	clientID     = "54437079"                                                                // Ваш app ID
+	clientSecret = "c3175a46c3175a46c3175a46d7c029fe91cc317c3175a46aa6bead05b0a4731cb5de7f6" // Замените на client_secret
 	redirectURL  = "https://oauth.vk.com/blank.html"
 	apiVersion   = "5.199"
-	port         = ":8080" // Порт для localhost
+	port         = ":80" // Порт для localhost
 )
 
 var (
@@ -169,7 +169,7 @@ func main() {
 	http.HandleFunc("/exchange", exchangeHandler)
 	http.HandleFunc("/", homeHandler) // Главная страница с кнопкой
 
-	log.Printf("Сервер запущен на http://localhost:8080")
+	log.Printf("Сервер запущен на http://localhost:80")
 	log.Fatal(http.ListenAndServe(port, nil))
 }
 
@@ -189,7 +189,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
                 if ('VKIDSDK' in window) {
                     const VKID = window.VKIDSDK;
                     console.log('VKID SDK loaded'); // Debug
-                    fetch('http://localhost:8080/init-pkce')
+                    fetch('http://localhost:80/init-pkce')
                         .then(response => response.json())
                         .then(data => {
                             console.log('PKCE data:', data); // Debug
@@ -214,7 +214,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
                                 console.log('Login success payload:', payload); // Debug
                                 const code = payload.code;
                                 const deviceId = payload.device_id;
-                                fetch('http://localhost:8080/exchange', {
+                                fetch('http://localhost:80/exchange', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ code: code, device_id: deviceId, state: data.state })
