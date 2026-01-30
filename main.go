@@ -1,97 +1,82 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
-	"time"
+
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/vk"
+
+	"github.com/SevereCloud/vksdk/v3/api"
 )
 
-var clickCounter int = 0
+const (
+	clientID     = "54387179"                      // Замените на ваш client_id из VK
+	clientSecret = "hturDjuQzeaN3nhD8myg"          // Замените на ваш client_secret
+	redirectURL  = "http://77.223.97.218/callback" // Ваш callback URI
+)
 
-// Обработчик для /ping
-func pingHandler(w http.ResponseWriter, r *http.Request) {
-	// Логируем попытку
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	clientIP := r.RemoteAddr
-	fmt.Printf("[%s] Получен ping от %s\n", timestamp, clientIP)
-
-	// Отправляем ответ
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("pong"))
-}
-
-// Обработчик для отслеживания кликов
-func clickHandler(w http.ResponseWriter, r *http.Request) {
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	clientIP := r.RemoteAddr
-
-	// Получаем информацию о клиенте
-	userAgent := r.UserAgent()
-	referer := r.Referer()
-	method := r.Method
-
-	// Увеличиваем счетчик
-	clickCounter++
-
-	// Логируем информацию о клике
-	fmt.Printf("========================================\n")
-	fmt.Printf("[%s] КЛИК ЗАФИКСИРОВАН!\n", timestamp)
-	fmt.Printf("Клиент: %s\n", clientIP)
-	fmt.Printf("User-Agent: %s\n", userAgent)
-	fmt.Printf("Метод запроса: %s\n", method)
-	fmt.Printf("Реферер: %s\n", referer)
-	fmt.Printf("Общее количество кликов: %d\n", clickCounter)
-	fmt.Printf("========================================\n")
-
-	// Отправляем JSON ответ с текущим счетчиком
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `{"status": "ok", "count": %d, "timestamp": "%s"}`, clickCounter, timestamp)
-}
-
-// Обработчик для сброса счетчика
-func resetHandler(w http.ResponseWriter, r *http.Request) {
-	timestamp := time.Now().Format("2006-01-02 15:04:05")
-	clientIP := r.RemoteAddr
-
-	oldCount := clickCounter
-	clickCounter = 0
-
-	// Логируем сброс
-	fmt.Printf("========================================\n")
-	fmt.Printf("[%s] СБРОС СЧЕТЧИКА!\n", timestamp)
-	fmt.Printf("Клиент: %s\n", clientIP)
-	fmt.Printf("Старое значение: %d\n", oldCount)
-	fmt.Printf("Новое значение: %d\n", clickCounter)
-	fmt.Printf("========================================\n")
-
-	// Отправляем JSON ответ
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, `{"status": "reset", "old_count": %d, "new_count": %d, "timestamp": "%s"}`, oldCount, clickCounter, timestamp)
+var oauthConf = &oauth2.Config{
+	ClientID:     clientID,
+	ClientSecret: clientSecret,
+	RedirectURL:  redirectURL,
+	Endpoint:     vk.Endpoint,       // Встроенные эндпоинты VK: https://oauth.vk.com/authorize и https://oauth.vk.com/access_token
+	Scopes:       []string{"email"}, // Опционально: добавьте scopes, если нужны (email, friends, photos и т.д.)
 }
 
 func main() {
-	// Регистрируем хендлеры
-	http.HandleFunc("/ping", pingHandler)
-	http.HandleFunc("/click", clickHandler)
-	http.HandleFunc("/reset", resetHandler)
+	http.HandleFunc("/", homeHandler)
+	http.HandleFunc("/login", loginHandler)
+	http.HandleFunc("/callback", callbackHandler)
 
-	// Указываем, что файлы в папке "static" нужно отдавать как статический сайт
-	fs := http.FileServer(http.Dir("./static"))
-	http.Handle("/", fs)
+	log.Println("Сервер запущен на http://77.223.97.218:80") // Порт по умолчанию 80 для HTTP
+	log.Fatal(http.ListenAndServe(":80", nil))
+}
 
-	port := ":80" // Go будет работать прямо на стандартном порту сайта
-	fmt.Printf("Сервер запущен на http://localhost%s\n", port)
-	fmt.Printf("Эндпоинты:\n")
-	fmt.Printf("  GET  http://localhost/ping  - проверка работы сервера\n")
-	fmt.Printf("  POST http://localhost/click - зафиксировать клик\n")
-	fmt.Printf("  POST http://localhost/reset - сбросить счетчик\n")
-	fmt.Println("\nЖдем клики...")
+// Главная страница с кнопкой "Войти через VK"
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, `<html><body><a href="/login">Войти через VK ID</a></body></html>`)
+}
 
-	err := http.ListenAndServe(port, nil)
-	if err != nil {
-		fmt.Println("Ошибка запуска:", err)
+// Генерация URL для авторизации и редирект
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	state := "random-state-string" // Для защиты от CSRF, сгенерируйте случайно и проверьте в callback
+	url := oauthConf.AuthCodeURL(state)
+	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
+}
+
+// Обработка callback от VK
+func callbackHandler(w http.ResponseWriter, r *http.Request) {
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		http.Error(w, "Code не получен", http.StatusBadRequest)
+		return
 	}
+
+	// Обмен code на token
+	token, err := oauthConf.Exchange(context.Background(), code)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Ошибка обмена token: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Создаем VK API клиент с token (используем vksdk для удобства)
+	vkClient := api.NewVK(token.AccessToken)
+
+	// Получаем данные пользователя (метод users.get)
+	params := api.Params{
+		"fields": "photo_200,first_name,last_name", // Поля: фото, имя, фамилия
+	}
+	users, err := vkClient.UsersGet(params)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Ошибка получения user info: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// Выводим данные (в реальности сохраните в сессии или БД)
+	userData, _ := json.Marshal(users)
+	fmt.Fprintf(w, "Успешная авторизация! Данные пользователя: %s\nAccess Token: %s", userData, token.AccessToken)
 }
