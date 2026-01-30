@@ -1,90 +1,243 @@
 package main
 
 import (
-	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
-	"strings"
-
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/vk"
+	"sync"
+	"time"
 
 	"github.com/SevereCloud/vksdk/v3/api"
 )
 
 const (
-	clientID     = "54387179"                      // Замените на ваш client_id из VK
-	clientSecret = "hturDjuQzeaN3nhD8myg"          // Замените на ваш client_secret
-	redirectURL  = "http://77.223.97.218/callback" // Ваш callback URI
+	clientID     = "54437079"             // Ваш app ID
+	clientSecret = "QS0LGDdzhwgEVatG20m8" // Замените на client_secret
+	redirectURL  = "https://oauth.vk.com/blank.html"
+	apiVersion   = "5.199"
+	port         = ":8080" // Порт для localhost
 )
 
-var oauthConf = &oauth2.Config{
-	ClientID:     clientID,
-	ClientSecret: clientSecret,
-	RedirectURL:  redirectURL,
-	Endpoint:     vk.Endpoint,                             // Встроенные эндпоинты VK: https://oauth.vk.com/authorize и https://oauth.vk.com/access_token
-	Scopes:       []string{"vkid.personal_info", "email"}, // Scopes для VK ID: базовая информация + email
-}
+var (
+	pkceStore = struct {
+		sync.Mutex
+		m map[string]string // state -> code_verifier
+	}{m: make(map[string]string)}
+)
 
-func main() {
-	http.HandleFunc("/", homeHandler)
-	http.HandleFunc("/login", loginHandler)
-	http.HandleFunc("/callback", callbackHandler)
-
-	log.Println("Сервер запущен на http://77.223.97.218:80") // Порт по умолчанию 80 для HTTP
-	log.Fatal(http.ListenAndServe(":80", nil))
-}
-
-// Главная страница с кнопкой "Войти через VK"
-func homeHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, `<html><body><a href="/login">Войти через VK ID</a></body></html>`)
-}
-
-// Генерация URL для авторизации и редирект
-func loginHandler(w http.ResponseWriter, r *http.Request) {
-	state := "random-state-string" // Для защиты от CSRF, сгенерируйте случайно и проверьте в callback
-	// Используем запятую для разделения scopes, как требует VK ID
-	scopeParam := strings.Join(oauthConf.Scopes, ",")
-	url := oauthConf.AuthCodeURL(state, oauth2.SetAuthURLParam("scope", scopeParam))
-	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
-}
-
-// Обработка callback от VK
-func callbackHandler(w http.ResponseWriter, r *http.Request) {
-	code := r.URL.Query().Get("code")
-	if code == "" {
-		http.Error(w, "Code не получен", http.StatusBadRequest)
-		return
+// Генерация random строки для verifier
+func generateVerifier() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
 	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
 
-	// Обмен code на token
-	token, err := oauthConf.Exchange(context.Background(), code)
+// Вычисление challenge = base64url(SHA256(verifier))
+func computeChallenge(verifier string) string {
+	h := sha256.Sum256([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(h[:])
+}
+
+// Endpoint для инициализации PKCE
+func initPkceHandler(w http.ResponseWriter, r *http.Request) {
+	verifier, err := generateVerifier()
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Ошибка обмена token: %v", err), http.StatusInternalServerError)
+		http.Error(w, "Ошибка генерации verifier", http.StatusInternalServerError)
+		return
+	}
+	state := "state_" + time.Now().Format("20060102150405") // Простой state
+	challenge := computeChallenge(verifier)
+
+	pkceStore.Lock()
+	pkceStore.m[state] = verifier
+	pkceStore.Unlock()
+
+	json.NewEncoder(w).Encode(map[string]string{
+		"state":          state,
+		"code_challenge": challenge,
+	})
+}
+
+// Endpoint для обмена code на token
+func exchangeHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Только POST", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Доступ к email (если scope=email): VK возвращает его в token.Extra
-	email := token.Extra("email")
-	userID := token.Extra("user_id")
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Ошибка body", http.StatusBadRequest)
+		return
+	}
 
-	// Создаем VK API клиент с token (используем vksdk для удобства)
-	vkClient := api.NewVK(token.AccessToken)
+	var data struct {
+		Code     string `json:"code"`
+		DeviceID string `json:"device_id"`
+		State    string `json:"state"`
+	}
+	if err := json.Unmarshal(body, &data); err != nil {
+		http.Error(w, "Ошибка JSON", http.StatusBadRequest)
+		return
+	}
 
-	// Получаем данные пользователя (метод users.get)
+	pkceStore.Lock()
+	verifier, ok := pkceStore.m[data.State]
+	delete(pkceStore.m, data.State) // Удаляем после использования
+	pkceStore.Unlock()
+	if !ok {
+		http.Error(w, "Неверный state", http.StatusBadRequest)
+		return
+	}
+
+	// Формируем запрос на exchange
+	url := "https://oauth.vk.com/access_token"
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		http.Error(w, "Ошибка запроса", http.StatusInternalServerError)
+		return
+	}
+
+	q := req.URL.Query()
+	q.Add("client_id", clientID)
+	q.Add("client_secret", clientSecret)
+	q.Add("redirect_uri", redirectURL)
+	q.Add("code", data.Code)
+	q.Add("device_id", data.DeviceID)
+	q.Add("code_verifier", verifier)
+	q.Add("v", apiVersion)
+	req.URL.RawQuery = q.Encode()
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Ошибка exchange: %v", err), http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	bodyResp, err := io.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "Ошибка чтения response", http.StatusInternalServerError)
+		return
+	}
+
+	var tokenResp map[string]interface{}
+	if err := json.Unmarshal(bodyResp, &tokenResp); err != nil {
+		http.Error(w, "Ошибка парсинга token", http.StatusInternalServerError)
+		return
+	}
+
+	if errMsg, ok := tokenResp["error"].(string); ok {
+		http.Error(w, fmt.Sprintf("Ошибка VK: %s - %s", errMsg, tokenResp["error_description"]), http.StatusBadRequest)
+		return
+	}
+
+	accessToken := tokenResp["access_token"].(string)
+
+	// Получаем данные пользователя
+	vkClient := api.NewVK(accessToken)
 	params := api.Params{
-		"fields": "photo_200,first_name,last_name,sex,bdate,city", // Поля из vkid.personal_info: фото, имя, фамилия, пол, дата рождения, город
-		"v":      "5.199",                                         // Версия API для совместимости
+		"fields": "photo_200,first_name,last_name,sex,bdate,city",
+		"v":      apiVersion,
 	}
 	users, err := vkClient.UsersGet(params)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Ошибка получения user info: %v", err), http.StatusInternalServerError)
+		http.Error(w, fmt.Sprintf("Ошибка user info: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	// Выводим данные (в реальности сохраните в сессии или БД)
-	userData, _ := json.Marshal(users)
-	fmt.Fprintf(w, "Успешная авторизация! Данные пользователя: %s\nEmail: %v\nUser ID: %v\nAccess Token: %s", userData, email, userID, token.AccessToken)
+	// Возвращаем данные клиенту
+	response := map[string]interface{}{
+		"access_token": accessToken,
+		"user_data":    users,
+		"email":        tokenResp["email"],
+		"user_id":      tokenResp["user_id"],
+	}
+	json.NewEncoder(w).Encode(response)
+}
+
+func main() {
+	http.HandleFunc("/init-pkce", initPkceHandler)
+	http.HandleFunc("/exchange", exchangeHandler)
+	http.HandleFunc("/", homeHandler) // Главная страница с кнопкой
+
+	log.Printf("Сервер запущен на http://localhost:8080")
+	log.Fatal(http.ListenAndServe(port, nil))
+}
+
+// Главная страница с кнопкой VK ID OneTap
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>VK ID Auth on Localhost</title>
+        </head>
+        <body>
+            <h1>Войти через VK ID</h1>
+            <div id="vkid-button-container"></div>
+            <script nonce="csp_nonce" src="https://unpkg.com/@vkid/sdk@2.4.1/dist-sdk/umd/index.js"></script>
+            <script nonce="csp_nonce" type="text/javascript">
+                if ('VKIDSDK' in window) {
+                    const VKID = window.VKIDSDK;
+                    console.log('VKID SDK loaded'); // Debug
+                    fetch('http://localhost:8080/init-pkce')
+                        .then(response => response.json())
+                        .then(data => {
+                            console.log('PKCE data:', data); // Debug
+                            VKID.Config.init({
+                                app: 54437079,
+                                redirectUrl: 'https://oauth.vk.com/blank.html',
+                                responseMode: VKID.ConfigResponseMode.Callback,
+                                source: VKID.ConfigSource.LOWCODE,
+                                scope: 'vkid.personal_info,email',
+                                state: data.state,
+                                codeChallenge: data.code_challenge,
+                                codeChallengeMethod: 'S256'
+                            });
+                            console.log('Config initialized'); // Debug
+                            const oneTap = new VKID.OneTap();
+                            oneTap.render({
+                                container: document.getElementById('vkid-button-container'),
+                                showAlternativeLogin: true
+                            })
+                            .on(VKID.WidgetEvents.ERROR, vkidOnError)
+                            .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, function (payload) {
+                                console.log('Login success payload:', payload); // Debug
+                                const code = payload.code;
+                                const deviceId = payload.device_id;
+                                fetch('http://localhost:8080/exchange', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ code: code, device_id: deviceId, state: data.state })
+                                })
+                                .then(response => response.json())
+                                .then(vkidOnSuccess)
+                                .catch(vkidOnError);
+                            });
+                        })
+                        .catch(vkidOnError);
+                 
+                    function vkidOnSuccess(data) {
+                        console.log('Success:', data);
+                    }
+                 
+                    function vkidOnError(error) {
+                        console.error('Error:', error);
+                    }
+                } else {
+                    console.error('VKIDSDK not in window');
+                }
+            </script>
+        </body>
+        </html>
+    `)
 }
