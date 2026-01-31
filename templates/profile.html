@@ -3,67 +3,262 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Профиль | rassilkiin.ru</title>
+		<title>Профиль | Маджента</title>
 		<link rel="stylesheet" href="/static/style.css" />
+		<link rel="preconnect" href="https://fonts.googleapis.com" />
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+		<link
+			href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+			rel="stylesheet"
+		/>
+		<link
+			rel="stylesheet"
+			href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+		/>
 	</head>
 	<body>
+		<div class="background-animation"></div>
+
 		<div class="container">
-			<div class="profile-card">
+			<div class="app-container profile-container">
+				<!-- Шапка профиля -->
 				<div class="profile-header">
-					<h1>Ваш профиль</h1>
-					<a href="/logout" class="logout-btn">Выйти</a>
-				</div>
-
-				<div class="user-profile">
-					{{if .Photo}}
-					<img src="{{.Photo}}" alt="Фото профиля" class="profile-photo" />
-					{{else}}
-					<div class="profile-photo placeholder">
-						{{printf "%.1s" .FirstName}}{{printf "%.1s" .LastName}}
+					<div class="profile-header-content">
+						<div class="logo">
+							<i class="fas fa-paper-plane logo-icon"></i>
+							<span class="logo-text">Маджента</span>
+						</div>
+						<h1 class="main-title">Ваш профиль</h1>
+						<p class="subtitle">
+							Добро пожаловать в сервис автоматической рассылки
+						</p>
 					</div>
-					{{end}}
 
-					<div class="user-info">
-						<h2>{{.FirstName}} {{.LastName}}</h2>
-
-						<div class="info-row">
-							<span class="label">ID пользователя:</span>
-							<span class="value">{{.UserID}}</span>
-						</div>
-
-						{{if .Email}}
-						<div class="info-row">
-							<span class="label">Email:</span>
-							<span class="value">{{.Email}}</span>
-						</div>
-						{{end}}
-
-						<div class="info-row">
-							<span class="label">Статус:</span>
-							<span class="value status-active">Авторизован через VK</span>
-						</div>
-
-						<div class="info-row">
-							<span class="label">Аккаунт:</span>
-							<span class="value">https://vk.com/id{{.UserID}}</span>
-						</div>
+					<div class="header-actions">
+						<a href="/" class="action-btn home-btn">
+							<i class="fas fa-home"></i>
+							<span>Главная</span>
+						</a>
+						<a href="/logout" class="action-btn logout-btn">
+							<i class="fas fa-sign-out-alt"></i>
+							<span>Выйти</span>
+						</a>
 					</div>
 				</div>
 
-				<div class="actions">
-					<a href="/" class="btn btn-primary">На главную</a>
-					<a
-						href="https://vk.com/id{{.UserID}}"
-						target="_blank"
-						class="btn btn-secondary"
-						>Открыть VK профиль</a
-					>
+				<!-- Основная информация профиля -->
+				<div class="card profile-card">
+					<div class="profile-main-info">
+						<div class="profile-avatar-section">
+							{{if .Photo}}
+							<img
+								src="{{.Photo}}"
+								alt="Фото профиля"
+								class="profile-avatar-img"
+							/>
+							{{else}}
+							<div class="profile-avatar-img placeholder">
+								<span class="avatar-initials"
+									>{{printf "%.1s" .FirstName}}{{printf "%.1s" .LastName}}</span
+								>
+							</div>
+							{{end}}
+
+							<div class="avatar-badge">
+								<i class="fab fa-vk"></i>
+							</div>
+
+							<div class="profile-status">
+								<span class="status-dot active"></span>
+								<span class="status-text">Активен</span>
+							</div>
+						</div>
+
+						<div class="profile-details">
+							<h2 class="profile-name">{{.FirstName}} {{.LastName}}</h2>
+							<p class="profile-username">Пользователь VK ID</p>
+
+							<div class="profile-stats">
+								<div class="stat-item">
+									<div class="stat-value">{{.UserID}}</div>
+									<div class="stat-label">ID пользователя</div>
+								</div>
+								<div class="stat-divider"></div>
+								{{if .Email}}
+								<div class="stat-item">
+									<div class="stat-value">
+										<i class="fas fa-envelope email-icon"></i>
+									</div>
+									<div class="stat-label">Email подтверждён</div>
+								</div>
+								{{end}}
+							</div>
+
+							<div class="profile-actions">
+								<a
+									href="https://vk.com/id{{.UserID}}"
+									target="_blank"
+									class="profile-action-btn vk-profile-btn"
+								>
+									<i class="fab fa-vk"></i>
+									<span>Открыть профиль VK</span>
+								</a>
+								<button class="profile-action-btn settings-btn">
+									<i class="fas fa-cog"></i>
+									<span>Настройки</span>
+								</button>
+							</div>
+						</div>
+					</div>
 				</div>
 
-				<div class="security-info">
-					<p>
-						🔐 Ваши данные защищены шифрованием. Сессия действительна 7 дней.
-					</p>
+				<!-- Детальная информация -->
+				<div class="profile-details-grid">
+					<div class="card detail-card">
+						<div class="detail-card-header">
+							<i class="fas fa-user-circle detail-icon"></i>
+							<h3>Информация профиля</h3>
+						</div>
+						<div class="detail-list">
+							<div class="detail-item">
+								<div class="detail-label">
+									<i class="fas fa-id-card"></i>
+									<span>ID пользователя:</span>
+								</div>
+								<div class="detail-value">{{.UserID}}</div>
+							</div>
+
+							<div class="detail-item">
+								<div class="detail-label">
+									<i class="fas fa-user"></i>
+									<span>Имя:</span>
+								</div>
+								<div class="detail-value">{{.FirstName}}</div>
+							</div>
+
+							<div class="detail-item">
+								<div class="detail-label">
+									<i class="fas fa-user"></i>
+									<span>Фамилия:</span>
+								</div>
+								<div class="detail-value">{{.LastName}}</div>
+							</div>
+
+							{{if .Email}}
+							<div class="detail-item">
+								<div class="detail-label">
+									<i class="fas fa-envelope"></i>
+									<span>Email:</span>
+								</div>
+								<div class="detail-value">{{.Email}}</div>
+							</div>
+							{{end}}
+						</div>
+					</div>
+
+					<div class="card detail-card">
+						<div class="detail-card-header">
+							<i class="fas fa-shield-alt detail-icon"></i>
+							<h3>Безопасность</h3>
+						</div>
+						<div class="detail-list">
+							<div class="detail-item">
+								<div class="detail-label">
+									<i class="fas fa-key"></i>
+									<span>Тип авторизации:</span>
+								</div>
+								<div class="detail-value">VK OAuth 2.0</div>
+							</div>
+
+							<div class="detail-item">
+								<div class="detail-label">
+									<i class="fas fa-clock"></i>
+									<span>Сессия активна:</span>
+								</div>
+								<div class="detail-value">7 дней</div>
+							</div>
+
+							<div class="detail-item">
+								<div class="detail-label">
+									<i class="fas fa-lock"></i>
+									<span>Шифрование:</span>
+								</div>
+								<div class="detail-value">AES-256</div>
+							</div>
+						</div>
+
+						<div class="security-status">
+							<div class="security-level high">
+								<i class="fas fa-check-circle"></i>
+								<span>Высокий уровень безопасности</span>
+							</div>
+						</div>
+					</div>
+				</div>
+
+				<!-- Действия -->
+				<div class="card quick-actions-card">
+					<h3 class="actions-title">Быстрые действия</h3>
+					<div class="quick-actions">
+						<a href="#" class="quick-action-btn">
+							<div class="quick-action-icon">
+								<i class="fas fa-rocket"></i>
+							</div>
+							<div class="quick-action-info">
+								<h4>Создать рассылку</h4>
+								<p>Начните отправку постов</p>
+							</div>
+							<div class="quick-action-arrow">
+								<i class="fas fa-chevron-right"></i>
+							</div>
+						</a>
+
+						<a href="#" class="quick-action-btn">
+							<div class="quick-action-icon">
+								<i class="fas fa-chart-line"></i>
+							</div>
+							<div class="quick-action-info">
+								<h4>Аналитика</h4>
+								<p>Статистика ваших постов</p>
+							</div>
+							<div class="quick-action-arrow">
+								<i class="fas fa-chevron-right"></i>
+							</div>
+						</a>
+
+						<a href="#" class="quick-action-btn">
+							<div class="quick-action-icon">
+								<i class="fas fa-cogs"></i>
+							</div>
+							<div class="quick-action-info">
+								<h4>Настройки</h4>
+								<p>Настройте свой аккаунт</p>
+							</div>
+							<div class="quick-action-arrow">
+								<i class="fas fa-chevron-right"></i>
+							</div>
+						</a>
+					</div>
+				</div>
+
+				<!-- Футер -->
+				<div class="footer">
+					<div class="footer-content">
+						<p class="copyright">
+							© 2024 Маджента – Сервис автоматической рассылки постов
+						</p>
+						<div class="footer-info">
+							<div class="connection-status">
+								<span class="status-dot active"></span>
+								<span>Соединение защищено</span>
+							</div>
+							<div class="footer-links">
+								<a href="#" class="footer-link">Помощь</a>
+								<a href="#" class="footer-link">Контакты</a>
+								<a href="#" class="footer-link">API</a>
+							</div>
+						</div>
+					</div>
 				</div>
 			</div>
 		</div>
