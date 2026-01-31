@@ -3,13 +3,16 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Профиль пользователя</title>
+		<title>Профиль | rassilkiin.ru</title>
 		<link rel="stylesheet" href="/static/style.css" />
 	</head>
 	<body>
 		<div class="container">
 			<div class="profile-card">
-				<h1>Ваш профиль</h1>
+				<div class="profile-header">
+					<h1>Ваш профиль</h1>
+					<a href="/logout" class="logout-btn">Выйти</a>
+				</div>
 
 				<div class="user-profile">
 					{{if .Photo}}
@@ -22,26 +25,45 @@
 
 					<div class="user-info">
 						<h2>{{.FirstName}} {{.LastName}}</h2>
+
 						<div class="info-row">
 							<span class="label">ID пользователя:</span>
 							<span class="value">{{.UserID}}</span>
 						</div>
+
 						{{if .Email}}
 						<div class="info-row">
 							<span class="label">Email:</span>
 							<span class="value">{{.Email}}</span>
 						</div>
 						{{end}}
+
 						<div class="info-row">
 							<span class="label">Статус:</span>
-							<span class="value active">Авторизован через VK</span>
+							<span class="value status-active">Авторизован через VK</span>
+						</div>
+
+						<div class="info-row">
+							<span class="label">Аккаунт:</span>
+							<span class="value">https://vk.com/id{{.UserID}}</span>
 						</div>
 					</div>
 				</div>
 
 				<div class="actions">
-					<a href="/" class="btn secondary">На главную</a>
-					<a href="/logout" class="btn logout">Выйти из аккаунта</a>
+					<a href="/" class="btn btn-primary">На главную</a>
+					<a
+						href="https://vk.com/id{{.UserID}}"
+						target="_blank"
+						class="btn btn-secondary"
+						>Открыть VK профиль</a
+					>
+				</div>
+
+				<div class="security-info">
+					<p>
+						🔐 Ваши данные защищены шифрованием. Сессия действительна 7 дней.
+					</p>
 				</div>
 			</div>
 		</div>

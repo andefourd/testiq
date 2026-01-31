@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -15,18 +16,14 @@ import (
 	"os"
 	"strings"
 	"time"
-
-	"github.com/joho/godotenv"
 )
 
-// Конфигурация из переменных окружения
-var (
-	VK_CLIENT_ID     = os.Getenv("VK_CLIENT_ID")
-	VK_CLIENT_SECRET = os.Getenv("VK_CLIENT_SECRET")
-	SESSION_SECRET   = os.Getenv("SESSION_SECRET")
-	PORT             = 443
-	ENVIRONMENT      = os.Getenv("ENVIRONMENT")
-	REDIRECT_URI     = "https://rassilkiin.ru/auth/vk/callback"
+// ЗАХАРДКОДЕННЫЕ ДАННЫЕ
+const (
+	VK_CLIENT_ID     = "54437079"
+	VK_CLIENT_SECRET = "c3175a46c3175a46c3175a46d7c029fe91cc317c3175a46aa6bead05b0a4731cb5de7f6"
+	VK_REDIRECT_URI  = "https://rassilkiin.ru/auth/vk/callback"
+	SESSION_SECRET   = "32_char_secret_key_for_aes_256!!"
 )
 
 // Структуры для VK API
@@ -49,7 +46,7 @@ type VKUser struct {
 	Photo100  string `json:"photo_100"`
 }
 
-// Данные сессии (храним в зашифрованной куке)
+// Данные сессии
 type SessionData struct {
 	UserID    int    `json:"user_id"`
 	FirstName string `json:"first_name"`
@@ -122,7 +119,7 @@ func getVKToken(code string) (*VKTokenResponse, error) {
 	params := url.Values{}
 	params.Add("client_id", VK_CLIENT_ID)
 	params.Add("client_secret", VK_CLIENT_SECRET)
-	params.Add("redirect_uri", REDIRECT_URI)
+	params.Add("redirect_uri", VK_REDIRECT_URI)
 	params.Add("code", code)
 
 	url := fmt.Sprintf("https://oauth.vk.com/access_token?%s", params.Encode())
@@ -208,7 +205,7 @@ func vkLoginHandler(w http.ResponseWriter, r *http.Request) {
 	params := url.Values{}
 	params.Add("client_id", VK_CLIENT_ID)
 	params.Add("display", "page")
-	params.Add("redirect_uri", REDIRECT_URI)
+	params.Add("redirect_uri", VK_REDIRECT_URI)
 	params.Add("scope", "email,photos,friends,status")
 	params.Add("response_type", "code")
 	params.Add("v", "5.199")
@@ -227,6 +224,7 @@ func vkCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	// Получаем токен
 	token, err := getVKToken(code)
 	if err != nil {
+		log.Printf("Ошибка получения токена: %v", err)
 		http.Error(w, "Ошибка получения токена", http.StatusInternalServerError)
 		return
 	}
@@ -234,6 +232,7 @@ func vkCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	// Получаем данные пользователя
 	user, err := getVKUserInfo(token.AccessToken, token.UserID)
 	if err != nil {
+		log.Printf("Ошибка получения данных пользователя: %v", err)
 		http.Error(w, "Ошибка получения данных пользователя", http.StatusInternalServerError)
 		return
 	}
@@ -251,6 +250,7 @@ func vkCallbackHandler(w http.ResponseWriter, r *http.Request) {
 	// Шифруем сессию
 	encryptedSession, err := encryptSession(sessionData)
 	if err != nil {
+		log.Printf("Ошибка шифрования сессии: %v", err)
 		http.Error(w, "Ошибка создания сессии", http.StatusInternalServerError)
 		return
 	}
@@ -262,7 +262,7 @@ func vkCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   86400 * 7, // 7 дней
 		HttpOnly: true,
-		Secure:   ENVIRONMENT == "production",
+		Secure:   true, // Только HTTPS
 		SameSite: http.SameSiteLaxMode,
 	}
 
@@ -331,22 +331,20 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatalf("Ошибка загрузки .env файла: %v", err)
-	}
+	log.Println("=== НАСТРОЙКИ ПРИЛОЖЕНИЯ ===")
+	log.Printf("VK Client ID: %s", VK_CLIENT_ID)
+	log.Printf("Redirect URI: %s", VK_REDIRECT_URI)
+	log.Printf("Запуск на порту: 443 (HTTPS)")
 
-	// Проверка обязательных переменных
-	requiredVars := []string{"VK_CLIENT_ID", "VK_CLIENT_SECRET", "SESSION_SECRET"}
-	for _, v := range requiredVars {
-		if os.Getenv(v) == "" {
-			log.Fatalf("Требуется переменная окружения: %s", v)
-		}
-	}
+	// Проверяем SSL сертификаты
+	certFile := "/etc/ssl/rassilkiin.crt" // Измените путь к вашему сертификату
+	keyFile := "/etc/ssl/rassilkiin.key"  // Измените путь к вашему ключу
 
-	// Установка значений по умолчанию
-	if ENVIRONMENT == "" {
-		ENVIRONMENT = "development"
+	if _, err := os.Stat(certFile); os.IsNotExist(err) {
+		log.Fatalf("SSL сертификат не найден: %s", certFile)
+	}
+	if _, err := os.Stat(keyFile); os.IsNotExist(err) {
+		log.Fatalf("SSL ключ не найден: %s", keyFile)
 	}
 
 	// Настройка маршрутов
@@ -358,19 +356,35 @@ func main() {
 	http.HandleFunc("/static/", staticHandler)
 	http.HandleFunc("/health", healthHandler)
 
+	// Настройки TLS
+	tlsConfig := &tls.Config{
+		MinVersion:               tls.VersionTLS12,
+		CurvePreferences:         []tls.CurveID{tls.X25519, tls.CurveP256},
+		PreferServerCipherSuites: true,
+		CipherSuites: []uint16{
+			tls.TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			tls.TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305,
+			tls.TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+			tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+		},
+	}
+
 	// Настройки сервера
 	server := &http.Server{
-		Addr:         ":" + "443",
+		Addr:         ":443",
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
+		TLSConfig:    tlsConfig,
 	}
 
-	log.Printf("Сервер запущен на порту %s в режиме %s", PORT, ENVIRONMENT)
-	log.Printf("VK Client ID: %s", VK_CLIENT_ID)
-	log.Printf("Redirect URI: %s", REDIRECT_URI)
+	log.Println("Сервер запускается...")
+	log.Println("Откройте в браузере: https://rassilkiin.ru")
 
-	if err := server.ListenAndServe(); err != nil {
-		log.Fatal(err)
+	// Запускаем HTTPS сервер
+	if err := server.ListenAndServeTLS(certFile, keyFile); err != nil {
+		log.Fatal("Ошибка запуска сервера:", err)
 	}
 }
