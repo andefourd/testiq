@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ru">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Вход через VK ID</title>
+		<link rel="stylesheet" href="/static/styles.css" />
+	</head>
+	<body>
+		<div class="container">
+			<div class="login-card">
+				<h1>Вход с помощью VK ID</h1>
+				<p class="description">
+					Приложению будут доступны:<br />
+					общая информация, посты на стене, сообщества и другое.
+				</p>
+
+				<div class="data-section">
+					<h3>📋 Передаваемые данные</h3>
+					<ul>
+						<li>Основная информация профиля</li>
+						<li>Email адрес</li>
+						<li>Список друзей</li>
+						<li>Фотографии профиля</li>
+					</ul>
+				</div>
+
+				<button
+					class="vk-login-button"
+					onclick="window.location.href = '/login/vk'"
+				>
+					<svg
+						width="24"
+						height="24"
+						viewBox="0 0 24 24"
+						style="margin-right: 12px"
+					>
+						<path
+							fill="#ffffff"
+							d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.888 16.912c-1.166.324-2.48.512-3.888.512-1.408 0-2.722-.188-3.888-.512-1.235-.344-2.292-.86-3.112-1.488l1.248-1.248c.66.536 1.468.976 2.384 1.248.916.272 1.884.408 2.888.408 1.004 0 1.972-.136 2.888-.408.916-.272 1.724-.712 2.384-1.248l1.248 1.248c-.82.628-1.877 1.144-3.112 1.488z"
+						/>
+					</svg>
+					Продолжить как Захар
+				</button>
+
+				<p class="phone-hint">+7 ... +72</p>
+
+				<a href="/login/vk" class="alternative-link">Войти в другой аккаунт</a>
+			</div>
+
+			<div class="info-card">
+				<h2>Как это работает?</h2>
+				<div class="steps">
+					<div class="step">
+						<span class="step-number">1</span>
+						<p>Нажмите кнопку "Продолжить как Захар"</p>
+					</div>
+					<div class="step">
+						<span class="step-number">2</span>
+						<p>Вы будете перенаправлены на страницу VK для авторизации</p>
+					</div>
+					<div class="step">
+						<span class="step-number">3</span>
+						<p>Разрешите доступ вашему приложению</p>
+					</div>
+					<div class="step">
+						<span class="step-number">4</span>
+						<p>Готово! Вы вошли в систему</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>

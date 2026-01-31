@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Профиль</title>
+		<link rel="stylesheet" href="/static/styles.css" />
+	</head>
+	<body>
+		<div class="container">
+			<div class="profile-card">
+				<h1>Ваш профиль</h1>
+
+				<div class="user-info">
+					{{if .Photo}}
+					<img src="{{.Photo}}" alt="Фото профиля" class="profile-photo" />
+					{{else}}
+					<div class="profile-photo placeholder">Фото</div>
+					{{end}}
+
+					<div class="user-details">
+						<h2>{{.FirstName}} {{.LastName}}</h2>
+						<p><strong>ID:</strong> {{.UserID}}</p>
+						<p><strong>Email:</strong> {{.Email}}</p>
+					</div>
+				</div>
+
+				<div class="actions">
+					<a href="/" class="btn btn-secondary">На главную</a>
+					<a href="/logout" class="btn btn-logout">Выйти</a>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>
