@@ -17,22 +17,11 @@ body {
 }
 
 .container {
-	max-width: 1200px;
 	width: 100%;
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 40px;
-	align-items: start;
+	max-width: 500px;
 }
 
-@media (max-width: 768px) {
-	.container {
-		grid-template-columns: 1fr;
-	}
-}
-
-.login-card,
-.info-card,
+.auth-card,
 .profile-card {
 	background: white;
 	border-radius: 20px;
@@ -40,35 +29,11 @@ body {
 	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
 }
 
-.login-card {
-	animation: slideInLeft 0.6s ease-out;
-}
-
-.info-card {
-	animation: slideInRight 0.6s ease-out;
-}
-
-.profile-card {
-	grid-column: 1 / -1;
-	max-width: 600px;
-	margin: 0 auto;
-}
-
 h1 {
 	color: #333;
 	margin-bottom: 20px;
 	font-size: 28px;
-}
-
-h2 {
-	color: #333;
-	margin-bottom: 30px;
-	font-size: 24px;
-}
-
-h3 {
-	color: #555;
-	margin: 20px 0 10px 0;
+	text-align: center;
 }
 
 .description {
@@ -76,29 +41,36 @@ h3 {
 	line-height: 1.6;
 	margin-bottom: 30px;
 	font-size: 16px;
+	text-align: center;
 }
 
-.data-section {
+.permissions {
 	background: #f8f9fa;
 	border-radius: 12px;
 	padding: 20px;
-	margin-bottom: 30px;
+	margin: 30px 0;
 	border-left: 4px solid #0077ff;
 }
 
-.data-section ul {
+.permissions h3 {
+	color: #555;
+	margin-bottom: 15px;
+	font-size: 18px;
+}
+
+.permissions ul {
 	list-style: none;
 	padding-left: 0;
 }
 
-.data-section li {
+.permissions li {
 	color: #555;
 	padding: 8px 0;
 	position: relative;
 	padding-left: 24px;
 }
 
-.data-section li:before {
+.permissions li:before {
 	content: '✓';
 	color: #0077ff;
 	position: absolute;
@@ -106,7 +78,7 @@ h3 {
 	font-weight: bold;
 }
 
-.vk-login-button {
+.vk-button {
 	background: linear-gradient(135deg, #0077ff 0%, #0050cc 100%);
 	color: white;
 	border: none;
@@ -120,16 +92,19 @@ h3 {
 	justify-content: center;
 	width: 100%;
 	transition: all 0.3s ease;
+	text-decoration: none;
 	margin: 20px 0;
 }
 
-.vk-login-button:hover {
+.vk-button:hover {
 	transform: translateY(-2px);
 	box-shadow: 0 10px 30px rgba(0, 119, 255, 0.3);
 }
 
-.vk-login-button:active {
-	transform: translateY(0);
+.vk-icon {
+	width: 24px;
+	height: 24px;
+	margin-right: 12px;
 }
 
 .phone-hint {
@@ -139,7 +114,7 @@ h3 {
 	margin-bottom: 20px;
 }
 
-.alternative-link {
+.alt-link {
 	display: block;
 	text-align: center;
 	color: #0077ff;
@@ -148,43 +123,12 @@ h3 {
 	transition: color 0.3s;
 }
 
-.alternative-link:hover {
+.alt-link:hover {
 	color: #0050cc;
 	text-decoration: underline;
 }
 
-.steps {
-	display: flex;
-	flex-direction: column;
-	gap: 25px;
-}
-
-.step {
-	display: flex;
-	align-items: flex-start;
-	gap: 20px;
-}
-
-.step-number {
-	background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-	color: white;
-	width: 40px;
-	height: 40px;
-	border-radius: 50%;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	font-weight: bold;
-	flex-shrink: 0;
-}
-
-.step p {
-	color: #555;
-	line-height: 1.5;
-	padding-top: 8px;
-}
-
-.user-info {
+.user-profile {
 	display: flex;
 	align-items: center;
 	gap: 30px;
@@ -209,19 +153,33 @@ h3 {
 	font-weight: bold;
 }
 
-.user-details {
+.user-info h2 {
+	margin-bottom: 20px;
+	color: #333;
+	font-size: 24px;
+}
+
+.info-row {
+	display: flex;
+	margin-bottom: 10px;
+	padding-bottom: 10px;
+	border-bottom: 1px solid #eee;
+}
+
+.label {
+	font-weight: 600;
+	color: #555;
+	width: 150px;
+}
+
+.value {
+	color: #333;
 	flex: 1;
 }
 
-.user-details h2 {
-	margin-bottom: 10px;
-	color: #333;
-}
-
-.user-details p {
-	color: #666;
-	margin-bottom: 8px;
-	font-size: 16px;
+.value.active {
+	color: #28a745;
+	font-weight: 600;
 }
 
 .actions {
@@ -240,42 +198,49 @@ h3 {
 	flex: 1;
 }
 
-.btn-secondary {
+.btn.secondary {
 	background: #f1f3f4;
 	color: #333;
+	border: 1px solid #ddd;
 }
 
-.btn-secondary:hover {
+.btn.secondary:hover {
 	background: #e8eaed;
 }
 
-.btn-logout {
+.btn.logout {
 	background: #ff3b30;
 	color: white;
+	border: 1px solid #ff3b30;
 }
 
-.btn-logout:hover {
+.btn.logout:hover {
 	background: #d70015;
 }
 
-@keyframes slideInLeft {
-	from {
-		opacity: 0;
-		transform: translateX(-30px);
+@media (max-width: 600px) {
+	.container {
+		padding: 10px;
 	}
-	to {
-		opacity: 1;
-		transform: translateX(0);
-	}
-}
 
-@keyframes slideInRight {
-	from {
-		opacity: 0;
-		transform: translateX(30px);
+	.auth-card,
+	.profile-card {
+		padding: 20px;
 	}
-	to {
-		opacity: 1;
-		transform: translateX(0);
+
+	.user-profile {
+		flex-direction: column;
+		text-align: center;
+		gap: 20px;
+	}
+
+	.info-row {
+		flex-direction: column;
+		text-align: left;
+	}
+
+	.label {
+		width: 100%;
+		margin-bottom: 5px;
 	}
 }

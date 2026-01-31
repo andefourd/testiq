@@ -3,31 +3,45 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Профиль</title>
-		<link rel="stylesheet" href="/static/styles.css" />
+		<title>Профиль пользователя</title>
+		<link rel="stylesheet" href="/static/style.css" />
 	</head>
 	<body>
 		<div class="container">
 			<div class="profile-card">
 				<h1>Ваш профиль</h1>
 
-				<div class="user-info">
+				<div class="user-profile">
 					{{if .Photo}}
 					<img src="{{.Photo}}" alt="Фото профиля" class="profile-photo" />
 					{{else}}
-					<div class="profile-photo placeholder">Фото</div>
+					<div class="profile-photo placeholder">
+						{{printf "%.1s" .FirstName}}{{printf "%.1s" .LastName}}
+					</div>
 					{{end}}
 
-					<div class="user-details">
+					<div class="user-info">
 						<h2>{{.FirstName}} {{.LastName}}</h2>
-						<p><strong>ID:</strong> {{.UserID}}</p>
-						<p><strong>Email:</strong> {{.Email}}</p>
+						<div class="info-row">
+							<span class="label">ID пользователя:</span>
+							<span class="value">{{.UserID}}</span>
+						</div>
+						{{if .Email}}
+						<div class="info-row">
+							<span class="label">Email:</span>
+							<span class="value">{{.Email}}</span>
+						</div>
+						{{end}}
+						<div class="info-row">
+							<span class="label">Статус:</span>
+							<span class="value active">Авторизован через VK</span>
+						</div>
 					</div>
 				</div>
 
 				<div class="actions">
-					<a href="/" class="btn btn-secondary">На главную</a>
-					<a href="/logout" class="btn btn-logout">Выйти</a>
+					<a href="/" class="btn secondary">На главную</a>
+					<a href="/logout" class="btn logout">Выйти из аккаунта</a>
 				</div>
 			</div>
 		</div>

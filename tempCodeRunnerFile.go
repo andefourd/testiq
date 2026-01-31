@@ -1,0 +1,2 @@
+
+	SESSION_SECRET   = os.Getenv("SESSION_SECRET")

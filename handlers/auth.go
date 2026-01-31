@@ -11,20 +11,14 @@ import (
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
-	"golang.org/x/oauth2"
 )
 
 // Конфигурация VK OAuth
-var vkOAuthConfig = &oauth2.Config{
-	ClientID:     os.Getenv("VK_CLIENT_ID"),     // Замените на ваш Client ID
-	ClientSecret: os.Getenv("VK_CLIENT_SECRET"), // Замените на ваш Client Secret
-	RedirectURL:  "http://localhost:8080/auth/vk/callback",
-	Scopes:       []string{"email", "friends", "photos", "status"},
-	Endpoint: oauth2.Endpoint{
-		AuthURL:  "https://oauth.vk.com/authorize",
-		TokenURL: "https://oauth.vk.com/access_token",
-	},
-}
+var (
+	clientID     = os.Getenv("VK_CLIENT_ID")
+	clientSecret = os.Getenv("VK_CLIENT_SECRET")
+	redirectURL  = os.Getenv("VK_REDIRECT_URL")
+)
 
 // Структуры для парсинга ответов VK
 type VKUserResponse struct {
@@ -48,11 +42,17 @@ type VKTokenResponse struct {
 
 // VKLoginHandler - перенаправление на страницу авторизации VK
 func VKLoginHandler(c *gin.Context) {
+	if clientID == "" || redirectURL == "" {
+		log.Println("VK_CLIENT_ID или VK_REDIRECT_URL не установлены")
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Конфигурация сервера неполна"})
+		return
+	}
+
 	// Генерируем URL для авторизации с дополнительными параметрами VK
 	authURL := fmt.Sprintf("%s?client_id=%s&redirect_uri=%s&scope=%s&response_type=code&v=5.199&state=random_state",
-		vkOAuthConfig.Endpoint.AuthURL,
-		vkOAuthConfig.ClientID,
-		url.QueryEscape(vkOAuthConfig.RedirectURL),
+		"https://oauth.vk.com/authorize",
+		clientID,
+		url.QueryEscape(redirectURL),
 		"email,friends,photos,status",
 	)
 
@@ -100,14 +100,18 @@ func VKCallbackHandler(c *gin.Context) {
 
 // exchangeCodeForToken - обмен кода авторизации на токен доступа
 func exchangeCodeForToken(code string) (*VKTokenResponse, error) {
+	if clientID == "" || clientSecret == "" || redirectURL == "" {
+		return nil, fmt.Errorf("конфигурация VK неполна")
+	}
+
 	// Формируем URL для получения токена
 	params := url.Values{}
-	params.Add("client_id", vkOAuthConfig.ClientID)
-	params.Add("client_secret", vkOAuthConfig.ClientSecret)
-	params.Add("redirect_uri", vkOAuthConfig.RedirectURL)
+	params.Add("client_id", clientID)
+	params.Add("client_secret", clientSecret)
+	params.Add("redirect_uri", redirectURL)
 	params.Add("code", code)
 
-	tokenURL := fmt.Sprintf("%s?%s", vkOAuthConfig.Endpoint.TokenURL, params.Encode())
+	tokenURL := fmt.Sprintf("%s?%s", "https://oauth.vk.com/access_token", params.Encode())
 
 	// Выполняем запрос
 	resp, err := http.Get(tokenURL)
