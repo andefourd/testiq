@@ -3,177 +3,71 @@
 	<head>
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>Маджента – Вход через VK ID</title>
+		<title>Вход через VK ID | Маджента</title>
 		<link rel="stylesheet" href="/static/style.css" />
-		<link rel="preconnect" href="https://fonts.googleapis.com" />
-		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-		<link
-			href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
-			rel="stylesheet"
-		/>
-		<link
-			rel="stylesheet"
-			href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-		/>
 	</head>
 	<body>
-		<div class="background-animation"></div>
-
 		<div class="container">
-			<div class="app-container">
-				<!-- Логотип и заголовок -->
-				<div class="app-header">
-					<div class="logo">
-						<i class="fas fa-paper-plane logo-icon"></i>
-						<span class="logo-text">Маджента</span>
-					</div>
-					<h1 class="main-title">Вход с помощью VK ID</h1>
-					<p class="subtitle">
-						Приложению <strong>«Маджента – рассылка постов»</strong> будут
-						доступны:<br />
-						общая информация, посты на стене, сообщества и другое.
-					</p>
+			<div class="auth-card">
+				<h1>Вход с помощью VK ID</h1>
+
+				<p class="description">
+					Приложению «Маджента – рассылка постов» будут доступны:<br />
+					общая информация, посты на стене, сообщества и другое.
+				</p>
+
+				<h3>Передаваемые данные</h3>
+
+				<ul class="permissions-list">
+					<li>
+						<strong>Основная информация</strong><br />Имя, фамилия, фото профиля
+					</li>
+					<li><strong>Email адрес</strong><br />Только для уведомлений</li>
+					<li>
+						<strong>Друзья и сообщества</strong><br />Список друзей и групп
+					</li>
+					<li><strong>Фотографии</strong><br />Доступ к фото профиля</li>
+				</ul>
+
+				<div class="security-note">
+					<input type="checkbox" checked disabled />
+					Ваши данные защищены и не передаются третьим лицам
 				</div>
 
-				<!-- Основная карточка -->
-				<div class="card main-card">
-					<!-- Информация о пользователе (если бы была предзагрузка) -->
-					<div class="user-preview">
-						<div class="user-avatar">
-							<div class="avatar-placeholder">
-								<i class="fas fa-user"></i>
-							</div>
-							<div class="user-badge">
-								<i class="fab fa-vk vk-badge"></i>
-							</div>
-						</div>
-						<div class="user-preview-info">
-							<h3>Продолжить как Захар</h3>
-							<p class="user-phone">+7 ... +72</p>
-						</div>
-					</div>
+				<a href="/login/vk" class="vk-button">
+					<svg class="vk-icon" viewBox="0 0 24 24">
+						<path
+							fill="#fff"
+							d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.888 16.912c-1.166.324-2.48.512-3.888.512-1.408 0-2.722-.188-3.888-.512-1.235-.344-2.292-.86-3.112-1.488l1.248-1.248c.66.536 1.468.976 2.384 1.248.916.272 1.884.408 2.888.408 1.004 0 1.972-.136 2.888-.408.916-.272 1.724-.712 2.384-1.248l1.248 1.248c-.82.628-1.877 1.144-3.112 1.488z"
+						/>
+					</svg>
+					Продолжить с VK ID
+					<span class="button-subtitle">Быстрый и безопасный вход</span>
+				</a>
 
-					<!-- Кнопка VK -->
-					<a href="/login/vk" class="vk-auth-button">
-						<div class="vk-button-content">
-							<div class="vk-icon-container">
-								<svg class="vk-icon" viewBox="0 0 24 24">
-									<path
-										fill="currentColor"
-										d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.888 16.912c-1.166.324-2.48.512-3.888.512-1.408 0-2.722-.188-3.888-.512-1.235-.344-2.292-.86-3.112-1.488l1.248-1.248c.66.536 1.468.976 2.384 1.248.916.272 1.884.408 2.888.408 1.004 0 1.972-.136 2.888-.408.916-.272 1.724-.712 2.384-1.248l1.248 1.248c-.82.628-1.877 1.144-3.112 1.488z"
-									/>
-								</svg>
-							</div>
-							<div class="vk-button-text">
-								<span class="vk-button-title">Продолжить с VK ID</span>
-								<span class="vk-button-subtitle"
-									>Быстрый и безопасный вход</span
-								>
-							</div>
-							<div class="vk-button-arrow">
-								<i class="fas fa-chevron-right"></i>
-							</div>
-						</div>
-						<div class="vk-button-wave"></div>
-					</a>
-
-					<!-- Дополнительные опции -->
-					<div class="alternative-options">
-						<a href="/login/vk" class="alt-link">
-							<i class="fas fa-user-circle"></i>
-							<span>Войти в другой аккаунт</span>
-						</a>
-						<a href="#" class="alt-link">
-							<i class="fas fa-question-circle"></i>
-							<span>Помощь со входом</span>
-						</a>
-					</div>
+				<div class="alternative-links">
+					<a href="/login/vk" class="alt-link">Войти в другой аккаунт</a>
+					<a href="#" class="alt-link">Помощь со входом</a>
 				</div>
 
-				<!-- Карточка с правами доступа -->
-				<div class="card permissions-card">
-					<div class="permissions-header">
-						<i class="fas fa-shield-alt permission-icon"></i>
-						<h3>Передаваемые данные</h3>
-					</div>
-
-					<div class="permissions-list">
-						<div class="permission-item">
-							<div class="permission-icon-container">
-								<i class="fas fa-user-check"></i>
-							</div>
-							<div class="permission-info">
-								<h4>Основная информация</h4>
-								<p>Имя, фамилия, фото профиля</p>
-							</div>
-						</div>
-
-						<div class="permission-item">
-							<div class="permission-icon-container">
-								<i class="fas fa-envelope"></i>
-							</div>
-							<div class="permission-info">
-								<h4>Email адрес</h4>
-								<p>Только для уведомлений</p>
-							</div>
-						</div>
-
-						<div class="permission-item">
-							<div class="permission-icon-container">
-								<i class="fas fa-users"></i>
-							</div>
-							<div class="permission-info">
-								<h4>Друзья и сообщества</h4>
-								<p>Список друзей и групп</p>
-							</div>
-						</div>
-
-						<div class="permission-item">
-							<div class="permission-icon-container">
-								<i class="fas fa-images"></i>
-							</div>
-							<div class="permission-info">
-								<h4>Фотографии</h4>
-								<p>Доступ к фото профиля</p>
-							</div>
-						</div>
-					</div>
-
-					<div class="security-note">
-						<i class="fas fa-lock"></i>
-						<span>Ваши данные защищены и не передаются третьим лицам</span>
-					</div>
-				</div>
-
-				<!-- Футер -->
 				<div class="footer">
-					<p class="copyright">
-						© 2024 Маджента – Сервис автоматической рассылки
-					</p>
+					<p>© 2024 Маджента – Сервис автоматической рассылки</p>
 					<div class="footer-links">
-						<a href="#" class="footer-link">Политика конфиденциальности</a>
-						<a href="#" class="footer-link">Условия использования</a>
-						<a href="#" class="footer-link">Поддержка</a>
+						<a href="https://vk.com/support">Политика конфиденциальности</a>
+						<a href="#">Условия использования</a>
+						<a href="#">Поддержка</a>
 					</div>
 					<div class="ssl-badge">
-						<i class="fas fa-lock"></i>
-						<span>SSL Защищённое соединение</span>
+						<svg class="lock-icon" viewBox="0 0 24 24">
+							<path
+								fill="#28a745"
+								d="M12 2C9.243 2 7 4.243 7 7v3H6c-1.103 0-2 .897-2 2v8c0 1.103.897 2 2 2h12c1.103 0 2-.897 2-2v-8c0-1.103-.897-2-2-2h-1V7c0-2.757-2.243-5-5-5zm6 11v8H6v-8h12zm-9-2V7c0-1.654 1.346-3 3-3s3 1.346 3 3v4H9z"
+							/>
+						</svg>
+						SSL Защищённое соединение
 					</div>
 				</div>
 			</div>
 		</div>
-
-		<!-- Анимация волны -->
-		<script>
-			document
-				.querySelector('.vk-auth-button')
-				.addEventListener('mouseenter', function (e) {
-					const wave = this.querySelector('.vk-button-wave')
-					wave.style.animation = 'waveAnimation 0.8s ease-out'
-					setTimeout(() => {
-						wave.style.animation = ''
-					}, 800)
-				})
-		</script>
 	</body>
 </html>
