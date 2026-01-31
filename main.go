@@ -337,8 +337,8 @@ func main() {
 	log.Printf("Запуск на порту: 443 (HTTPS)")
 
 	// Проверяем SSL сертификаты
-	certFile := "/etc/ssl/rassilkiin.crt" // Измените путь к вашему сертификату
-	keyFile := "/etc/ssl/rassilkiin.key"  // Измените путь к вашему ключу
+	certFile := "/etc/ssl/rassilkin.ru/fullchain.pem" // Измените путь к вашему сертификату
+	keyFile := "/etc/ssl/rassilkin.ru/private.key"    // Измените путь к вашему ключу
 
 	if _, err := os.Stat(certFile); os.IsNotExist(err) {
 		log.Fatalf("SSL сертификат не найден: %s", certFile)
