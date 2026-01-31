@@ -167,6 +167,7 @@ func vkCallbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	code := r.URL.Query().Get("code")
+	log.Println("Code: ", code)
 	state := r.URL.Query().Get("state")
 	if code == "" || state == "" {
 		http.Error(w, "Missing code or state", http.StatusBadRequest)
@@ -223,9 +224,13 @@ func exchangeCodeForToken(code string) (*tokenResponse, error) {
 	}
 	q := u.Query()
 	q.Set("client_id", vkClientID)
+	log.Println("vkClientID: ", vkClientID)
 	q.Set("client_secret", vkClientSecret)
 	q.Set("redirect_uri", domainOrigin+redirectPath)
 	q.Set("code", code)
+
+	log.Println(q)
+
 	u.RawQuery = q.Encode()
 
 	resp, err := http.Get(u.String())
