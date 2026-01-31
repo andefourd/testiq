@@ -2,198 +2,299 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
+	"fmt"
+	"html/template"
 	"log"
+	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
-	"path/filepath"
-	"sync/atomic"
+	"sync"
 	"time"
+
+	"github.com/joho/godotenv"
 )
 
-// Определяем константы для путей к сертификатам и ключу
 const (
-	certFile  = "/etc/ssl/rassilkiin.ru/fullchain.pem"
-	keyFile   = "/etc/ssl/rassilkiin.ru/private.key"
-	staticDir = "./static"   // Папка для статических файлов
-	indexFile = "index.html" // Имя файла главной страницы
+	staticDir = "./static"
+	indexFile = "index.html"
+
+	// Redirect URI должен совпадать с тем, что вы указали в настройках VK-приложения
+	redirectPath = "/vk/callback"
 )
 
-// Глобальный счетчик (используем atomic для потокобезопасности)
-var globalCounter atomic.Int64
+var (
+	vkClientID     = os.Getenv("VK_CLIENT_ID")
+	vkClientSecret = os.Getenv("VK_CLIENT_SECRET")
+	domainOrigin   = "" // заполним ниже из окружения или определим динамически
+	stateStore     = NewStateStore()
+)
+
+// Простое хранилище временных состояний (state) для защиты от CSRF
+type StateStore struct {
+	m map[string]time.Time
+	sync.Mutex
+}
+
+func NewStateStore() *StateStore {
+	return &StateStore{m: make(map[string]time.Time)}
+}
+
+func (s *StateStore) Put(state string) {
+	s.Lock()
+	defer s.Unlock()
+	s.m[state] = time.Now().Add(10 * time.Minute)
+}
+
+func (s *StateStore) Valid(state string) bool {
+	s.Lock()
+	defer s.Unlock()
+	exp, ok := s.m[state]
+	if !ok {
+		return false
+	}
+	if time.Now().After(exp) {
+		delete(s.m, state)
+		return false
+	}
+	delete(s.m, state) // одноразовый
+	return true
+}
 
 func main() {
-	// Инициализация счетчика
-	globalCounter.Store(0)
+	godotenv.Load()
 
-	// --- Проверка наличия файлов сертификатов ---
-	if _, err := os.Stat(certFile); os.IsNotExist(err) {
-		log.Fatalf("Ошибка: файл сертификата не найден по пути %s", certFile)
-	}
-	if _, err := os.Stat(keyFile); os.IsNotExist(err) {
-		log.Fatalf("Ошибка: файл приватного ключа не найден по пути %s", keyFile)
-	}
-	// --- Проверка наличия папки static и index.html ---
-	if _, err := os.Stat(staticDir); os.IsNotExist(err) {
-		log.Fatalf("Ошибка: папка статических файлов '%s' не найдена. Создайте её.", staticDir)
-	}
-	if _, err := os.Stat(filepath.Join(staticDir, indexFile)); os.IsNotExist(err) {
-		log.Fatalf("Ошибка: файл '%s' не найден в папке '%s'. Создайте его.", indexFile, staticDir)
+	vkClientID := os.Getenv("VK_CLIENT_ID")
+	vkClientSecret := os.Getenv("VK_CLIENT_SECRET")
+	domainOrigin := os.Getenv("SITE_ORIGIN")
+
+	// Проверки
+	if vkClientID == "" || vkClientSecret == "" {
+		log.Fatal("Не задан VK_CLIENT_ID или VK_CLIENT_SECRET. Установите переменные окружения.")
 	}
 
-	// Создаем мультиплексор (роутер) для обработки HTTP-запросов
 	mux := http.NewServeMux()
 
-	// --- Добавляем новые хендлеры ---
+	// Статика (основная страница)
+	mux.Handle("/", http.FileServer(http.Dir(staticDir)))
 
-	// Хендлер для проверки работоспособности сервера
-	mux.HandleFunc("/ping", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("[PING] %s %s %s %s", r.RemoteAddr, r.Method, r.URL.Path, r.Proto)
+	// Запуск OAuth: /vk/start -> редирект на oauth.vk.com/authorize
+	mux.HandleFunc("/vk/start", vkStartHandler)
 
-		w.Header().Set("Content-Type", "application/json")
-		response := map[string]string{
-			"status":  "ok",
-			"message": "pong",
-			"time":    time.Now().Format(time.RFC3339),
-		}
-		json.NewEncoder(w).Encode(response)
+	// Callback: VK перенаправит сюда с ?code=...&state=...
+	mux.HandleFunc(redirectPath, vkCallbackHandler)
+
+	// Простая health-страница
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("ok"))
 	})
 
-	// Хендлер для увеличения счетчика
-	mux.HandleFunc("/increase", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("[INCREASE] %s %s %s %s", r.RemoteAddr, r.Method, r.URL.Path, r.Proto)
-
-		// Увеличиваем счетчик
-		newValue := globalCounter.Add(1)
-
-		w.Header().Set("Content-Type", "application/json")
-		response := map[string]interface{}{
-			"status":      "success",
-			"new_value":   newValue,
-			"message":     "Счетчик увеличен",
-			"incremented": true,
-			"timestamp":   time.Now().Format(time.RFC3339),
-		}
-		json.NewEncoder(w).Encode(response)
-	})
-
-	// Хендлер для получения текущего значения счетчика
-	mux.HandleFunc("/counter", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("[COUNTER] %s %s %s %s", r.RemoteAddr, r.Method, r.URL.Path, r.Proto)
-
-		currentValue := globalCounter.Load()
-
-		w.Header().Set("Content-Type", "application/json")
-		response := map[string]interface{}{
-			"status":    "success",
-			"value":     currentValue,
-			"timestamp": time.Now().Format(time.RFC3339),
-		}
-		json.NewEncoder(w).Encode(response)
-	})
-
-	// Хендлер для сброса счетчика
-	mux.HandleFunc("/counter/reset", func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("[COUNTER RESET] %s %s %s %s", r.RemoteAddr, r.Method, r.URL.Path, r.Proto)
-
-		oldValue := globalCounter.Swap(0)
-
-		w.Header().Set("Content-Type", "application/json")
-		response := map[string]interface{}{
-			"status":    "success",
-			"old_value": oldValue,
-			"new_value": 0,
-			"message":   "Счетчик сброшен",
-			"timestamp": time.Now().Format(time.RFC3339),
-		}
-		json.NewEncoder(w).Encode(response)
-	})
-
-	// Обработчик для всех остальных запросов (статические файлы)
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		// Логируем каждый входящий запрос
-		log.Printf("[%s] %s %s %s", r.RemoteAddr, r.Method, r.URL.Path, r.Proto)
-
-		// Формируем полный путь к файлу в папке static
-		requestedPath := filepath.Join(staticDir, filepath.Clean(r.URL.Path))
-
-		// Проверяем, существует ли запрошенный файл и не является ли он директорией
-		if stat, err := os.Stat(requestedPath); err == nil && !stat.IsDir() {
-			// Если файл существует, отдаем его
-			http.ServeFile(w, r, requestedPath)
-			return
-		}
-
-		// Если запрошенный путь является корневым ("/") или файл не найден,
-		// отдаем index.html
-		http.ServeFile(w, r, filepath.Join(staticDir, indexFile))
-	})
-
-	// --- Настройка HTTPS сервера ---
-	httpsSrv := &http.Server{
-		Addr:         ":443", // Слушаем порт 443 для HTTPS
-		Handler:      mux,    // Используем наш мультиплексор
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
+	server := &http.Server{
+		Addr:         ":443",
+		Handler:      loggingMiddleware(mux),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  120 * time.Second,
-		TLSConfig: &tls.Config{ // Настройки TLS для безопасности
-			MinVersion:               tls.VersionTLS12,
-			PreferServerCipherSuites: true,
-			CurvePreferences: []tls.CurveID{
-				tls.CurveP256,
-				tls.X25519,
-			},
-		},
 	}
 
-	// Запускаем HTTPS сервер в отдельной горутине
+	// Запуск HTTPS и HTTP редиректа (на случай, если вы хотите редиректить)
 	go func() {
-		log.Println("Запуск HTTPS сервера на https://rassilkiin.ru (порт 443)")
-		if err := httpsSrv.ListenAndServeTLS(certFile, keyFile); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Ошибка запуска HTTPS сервера: %v", err)
+		log.Println("Запуск HTTPS на :443")
+		cert := "/etc/ssl/rassilkiin.ru/fullchain.pem"
+		key := "/etc/ssl/rassilkiin.ru/private.key"
+		if err := server.ListenAndServeTLS(cert, key); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTPS error: %v", err)
 		}
 	}()
 
-	// --- Настройка HTTP сервера для редиректа ---
-	httpSrv := &http.Server{
-		Addr: ":80", // Слушаем порт 80 для HTTP
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Логируем запросы, приходящие на HTTP
-			log.Printf("[HTTP Redirect] %s %s %s %s -> HTTPS", r.RemoteAddr, r.Method, r.URL.Path, r.Proto)
-			// Перенаправляем на HTTPS
-			http.Redirect(w, r, "https://"+r.Host+r.RequestURI, http.StatusMovedPermanently)
-		}),
-	}
-
-	// Запускаем HTTP сервер в отдельной горутине
+	// HTTP redirect -> HTTPS
 	go func() {
-		log.Println("Запуск HTTP сервера для редиректа на HTTPS (порт 80)")
+		httpSrv := &http.Server{
+			Addr: ":80",
+			Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, domainOrigin+r.RequestURI, http.StatusMovedPermanently)
+			}),
+		}
+		log.Println("Запуск HTTP на :80 (редирект на HTTPS)")
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Ошибка запуска HTTP сервера: %v", err)
+			log.Printf("HTTP redirect error: %v", err)
 		}
 	}()
 
-	// --- Обработка сигналов для аккуратного завершения работы ---
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, os.Interrupt, os.Kill) // Отлавливаем Ctrl+C и сигнал завершения
-	<-quit                                     // Ожидаем сигнал
-	log.Println("Получен сигнал завершения. Начинаю остановку серверов...")
-
-	// Создаем контекст с таймаутом для остановки HTTPS сервера
-	ctxHttps, cancelHttps := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancelHttps()
-	if err := httpsSrv.Shutdown(ctxHttps); err != nil {
-		log.Fatalf("Ошибка при остановке HTTPS сервера: %v", err)
-	}
-
-	// Создаем контекст с таймаутом для остановки HTTP сервера
-	ctxHttp, cancelHttp := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancelHttp()
-	if err := httpSrv.Shutdown(ctxHttp); err != nil {
-		log.Fatalf("Ошибка при остановке HTTP сервера: %v", err)
-	}
-
-	log.Println("Все серверы остановлены. Приложение завершило работу.")
+	// Graceful shutdown
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt)
+	<-stop
+	log.Println("Shutdown signal received. Stopping servers...")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_ = server.Shutdown(ctx)
+	log.Println("Server stopped")
 }
+
+// vkStartHandler генерирует state и редиректит пользователя на VK OAuth
+func vkStartHandler(w http.ResponseWriter, r *http.Request) {
+	state := randString(24)
+	stateStore.Put(state)
+
+	authURL := url.URL{
+		Scheme: "https",
+		Host:   "oauth.vk.com",
+		Path:   "/authorize",
+	}
+	q := authURL.Query()
+	q.Set("client_id", vkClientID)
+	q.Set("display", "page")
+	q.Set("redirect_uri", domainOrigin+redirectPath)
+	q.Set("scope", "email") // укажите требуемые scope
+	q.Set("response_type", "code")
+	q.Set("v", "5.131")
+	q.Set("state", state)
+	authURL.RawQuery = q.Encode()
+
+	http.Redirect(w, r, authURL.String(), http.StatusFound)
+}
+
+// vkCallbackHandler обменивает code на access_token и возвращает popup-страницу,
+// которая отправляет токен обратно в opener (window.opener.postMessage)
+func vkCallbackHandler(w http.ResponseWriter, r *http.Request) {
+	// Проверка ошибок/параметров
+	errParam := r.URL.Query().Get("error")
+	if errParam != "" {
+		http.Error(w, "OAuth error: "+errParam, http.StatusBadRequest)
+		return
+	}
+	code := r.URL.Query().Get("code")
+	state := r.URL.Query().Get("state")
+	if code == "" || state == "" {
+		http.Error(w, "Missing code or state", http.StatusBadRequest)
+		return
+	}
+	if !stateStore.Valid(state) {
+		http.Error(w, "Invalid state", http.StatusBadRequest)
+		return
+	}
+
+	// Обмен code на access_token
+	tokenResp, err := exchangeCodeForToken(code)
+	if err != nil {
+		log.Printf("Error exchanging code: %v", err)
+		http.Error(w, "Failed to exchange code: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Логируем токен в консоль (как вы просили)
+	log.Printf("Получен VK access_token: %s (user_id=%d, email=%s)", tokenResp.AccessToken, tokenResp.UserID, tokenResp.Email)
+
+	// Вернём HTML, который отправит токен в opener и закроет popup
+	tmpl := template.Must(template.New("popup").Parse(popupHTML))
+	data := struct {
+		Origin      string
+		AccessToken string
+		UserID      int64
+		Email       string
+		ExpiresIn   int
+	}{
+		Origin:      domainOrigin, // безопаснее указывать точный origin
+		AccessToken: tokenResp.AccessToken,
+		UserID:      tokenResp.UserID,
+		Email:       tokenResp.Email,
+		ExpiresIn:   tokenResp.ExpiresIn,
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_ = tmpl.Execute(w, data)
+}
+
+type tokenResponse struct {
+	AccessToken string `json:"access_token"`
+	ExpiresIn   int    `json:"expires_in"`
+	UserID      int64  `json:"user_id"`
+	Email       string `json:"email,omitempty"`
+}
+
+// exchangeCodeForToken вызывает VK token endpoint
+func exchangeCodeForToken(code string) (*tokenResponse, error) {
+	u := url.URL{
+		Scheme: "https",
+		Host:   "oauth.vk.com",
+		Path:   "/access_token",
+	}
+	q := u.Query()
+	q.Set("client_id", vkClientID)
+	q.Set("client_secret", vkClientSecret)
+	q.Set("redirect_uri", domainOrigin+redirectPath)
+	q.Set("code", code)
+	u.RawQuery = q.Encode()
+
+	resp, err := http.Get(u.String())
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// VK возвращает JSON с access_token или ошибкой
+	if resp.StatusCode != http.StatusOK {
+		var bodyBytes = make([]byte, 0)
+		_ = json.NewDecoder(resp.Body).Decode(&bodyBytes)
+		return nil, fmt.Errorf("vk token endpoint returned status %d", resp.StatusCode)
+	}
+
+	var tr tokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&tr); err != nil {
+		return nil, err
+	}
+	return &tr, nil
+}
+
+// Простой логирующий middleware
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%s %s %s", r.RemoteAddr, r.Method, r.URL.Path)
+		next.ServeHTTP(w, r)
+	})
+}
+
+func randString(n int) string {
+	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, n)
+	seed := rand.New(rand.NewSource(time.Now().UnixNano()))
+	for i := range b {
+		b[i] = letters[seed.Intn(len(letters))]
+	}
+	return string(b)
+}
+
+var popupHTML = `<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>VK Auth</title>
+</head>
+<body>
+  <script>
+    // сообщение родительскому окну (opener)
+    (function() {
+      try {
+        var payload = {
+          access_token: "{{.AccessToken}}",
+          user_id: {{.UserID}},
+          email: "{{.Email}}",
+          expires_in: {{.ExpiresIn}}
+        };
+        // отправляем только на наш origin
+        var targetOrigin = "{{.Origin}}";
+        if (window.opener && !window.opener.closed) {
+          window.opener.postMessage(payload, targetOrigin);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      // закрываем popup через короткую паузу
+      setTimeout(function(){ window.close(); }, 300);
+    })();
+  </script>
+  <p>Авторизация завершена. Можно закрыть окно.</p>
+</body>
+</html>`
