@@ -336,16 +336,20 @@ func main() {
 	log.Printf("Redirect URI: %s", VK_REDIRECT_URI)
 	log.Printf("Запуск на порту: 443 (HTTPS)")
 
-	// Проверяем SSL сертификаты
-	certFile := "/etc/ssl/rassilkin.ru/fullchain.pem" // Измените путь к вашему сертификату
-	keyFile := "/etc/ssl/rassilkin.ru/private.key"    // Измените путь к вашему ключу
+	// ПУТИ К ВАШИМ SSL СЕРТИФИКАТАМ - ИСПРАВЛЕННЫЕ
+	certFile := "/etc/ssl/rassilkiin.ru/fullchain.pem" // Полная цепочка сертификатов
+	keyFile := "/etc/ssl/rassilkiin.ru/private.key"    // Приватный ключ
 
+	// Проверяем существование файлов
 	if _, err := os.Stat(certFile); os.IsNotExist(err) {
 		log.Fatalf("SSL сертификат не найден: %s", certFile)
 	}
 	if _, err := os.Stat(keyFile); os.IsNotExist(err) {
 		log.Fatalf("SSL ключ не найден: %s", keyFile)
 	}
+
+	log.Printf("Используем SSL сертификат: %s", certFile)
+	log.Printf("Используем SSL ключ: %s", keyFile)
 
 	// Настройка маршрутов
 	http.HandleFunc("/", homeHandler)
@@ -382,6 +386,7 @@ func main() {
 
 	log.Println("Сервер запускается...")
 	log.Println("Откройте в браузере: https://rassilkiin.ru")
+	log.Println("Ожидание подключений на порту 443...")
 
 	// Запускаем HTTPS сервер
 	if err := server.ListenAndServeTLS(certFile, keyFile); err != nil {
