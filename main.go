@@ -1,10 +1,15 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
 
 // Simple struct for JSON response
@@ -50,15 +55,63 @@ func testPostHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// Redirect HTTP to HTTPS
+func redirectToHTTPS(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "https://"+r.Host+r.RequestURI, http.StatusMovedPermanently)
+}
+
 func main() {
 	// Register handlers
-	http.HandleFunc("/", homeHandler)              // Basic site root
-	http.HandleFunc("/test-get", testGetHandler)   // GET endpoint
-	http.HandleFunc("/test-post", testPostHandler) // POST endpoint
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", homeHandler)
+	mux.HandleFunc("/test-get", testGetHandler)
+	mux.HandleFunc("/test-post", testPostHandler)
 
-	// Start HTTPS server on port 443 with your cert and key
-	log.Println("Starting HTTPS server on :443")
-	if err := http.ListenAndServeTLS(":443", "/path/to/fullchain.pem", "/path/to/privkey.pem", nil); err != nil {
-		log.Fatal(err)
+	// HTTPS server
+	httpsSrv := &http.Server{
+		Addr:    ":443",
+		Handler: mux,
 	}
+
+	// HTTP server for redirect
+	httpSrv := &http.Server{
+		Addr:    ":80",
+		Handler: http.HandlerFunc(redirectToHTTPS),
+	}
+
+	// Start HTTP redirect in a goroutine
+	go func() {
+		log.Println("Starting HTTP redirect server on :80")
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTP server error: %v", err)
+		}
+	}()
+
+	// Start HTTPS server
+	go func() {
+		log.Println("Starting HTTPS server on :443")
+		// Updated paths based on your /etc/ssl/rassilkiin.ru directory (assuming standard file names; adjust if different)
+		certPath := "/etc/ssl/rassilkiin.ru/fullchain.pem" // Or cert.pem if that's the name
+		keyPath := "/etc/ssl/rassilkiin.ru/privkey.pem"    // Or key.pem if that's the name
+		if err := httpsSrv.ListenAndServeTLS(certPath, keyPath); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("HTTPS server error: %v", err)
+		}
+	}()
+
+	// Graceful shutdown
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	<-stop
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := httpsSrv.Shutdown(ctx); err != nil {
+		log.Printf("HTTPS shutdown error: %v", err)
+	}
+	if err := httpSrv.Shutdown(ctx); err != nil {
+		log.Printf("HTTP shutdown error: %v", err)
+	}
+
+	log.Println("Servers stopped gracefully")
 }
