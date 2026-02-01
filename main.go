@@ -1,212 +1,250 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"strings"
+	"sync"
 
 	"github.com/joho/godotenv"
 )
 
-// Хранилище для токена
-var accessToken string
+var (
+	store        sync.Map
+	clientID     string
+	clientSecret string
+	redirectURI  string
+	certFile     string
+	keyFile      string
+)
 
 func main() {
-	// Загружаем .env
 	err := godotenv.Load()
 	if err != nil {
-		log.Println("Не удалось загрузить .env, используем дефолтные")
+		log.Fatal("Error loading .env file")
 	}
 
-	// Получаем app_id и scope
-	appID := os.Getenv("VK_APP_ID")
-	if appID == "" {
-		log.Fatal("VK_APP_ID не задан в .env")
+	clientID = os.Getenv("VK_CLIENT_ID")
+	clientSecret = os.Getenv("VK_CLIENT_SECRET")
+	redirectURI = os.Getenv("VK_REDIRECT_URI")
+	certFile = os.Getenv("SSL_CERT_FILE")
+	keyFile = os.Getenv("SSL_KEY_FILE")
+
+	if clientID == "" || clientSecret == "" || redirectURI == "" || certFile == "" || keyFile == "" {
+		log.Fatal("Missing required environment variables")
 	}
-	scope := os.Getenv("VK_SCOPE") // e.g., "friends,photos"
 
-	// Эндпоинт для получения токена от клиента
-	http.HandleFunc("/receive-token", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Метод не поддерживается", http.StatusMethodNotAllowed)
-			return
-		}
+	http.HandleFunc("/", servePage)
+	http.HandleFunc("/auth", handleAuth)
+	log.Println("Starting server on :443")
+	err = http.ListenAndServeTLS(":443", certFile, keyFile, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
 
-		var data struct {
-			Token string `json:"token"`
-		}
+func servePage(w http.ResponseWriter, r *http.Request) {
+	// Generate code_verifier
+	verifier, err := generateVerifier()
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
 
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-			http.Error(w, "Неверный формат JSON", http.StatusBadRequest)
-			return
-		}
+	// Compute code_challenge
+	challenge := computeChallenge(verifier)
 
-		// Сохраняем токен
-		accessToken = data.Token
+	// Generate state
+	state, err := generateState()
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
 
-		// Выводим токен в консоль сервера
-		fmt.Println("Полученный токен:", accessToken)
+	// Store verifier with state
+	store.Store(state, verifier)
 
-		// Отправляем успешный ответ
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]bool{"success": true})
-	})
+	// HTML with embedded state and challenge
+	html := fmt.Sprintf(`
+<!DOCTYPE html>
+<html>
+<head>
+    <title>VK Auth</title>
+</head>
+<body>
+    <div>
+        <script nonce="csp_nonce" src="https://unpkg.com/@vkid/sdk@<3.0.0/dist-sdk/umd/index.js"></script>
+        <script nonce="csp_nonce" type="text/javascript">
+            if ('VKIDSDK' in window) {
+                const VKID = window.VKIDSDK;
 
-	// Главная страница с улучшенным дизайном и JS для VK Bridge
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		html := `
-		<!DOCTYPE html>
-		<html lang="ru">
-		<head>
-			<meta charset="UTF-8">
-			<meta name="viewport" content="width=device-width, initial-scale=1.0">
-			<title>VK Mini App</title>
-			<style>
-				body {
-					font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-					background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-					margin: 0;
-					padding: 0;
-					display: flex;
-					justify-content: center;
-					align-items: center;
-					min-height: 100vh;
-					color: #333;
-				}
-				.container {
-					background: white;
-					border-radius: 16px;
-					box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-					padding: 40px;
-					text-align: center;
-					max-width: 400px;
-					width: 90%;
-				}
-				h1 {
-					font-size: 28px;
-					margin-bottom: 30px;
-					color: #4c75a3;
-				}
-				button {
-					background: #4c75a3;
-					color: white;
-					border: none;
-					border-radius: 8px;
-					padding: 15px 30px;
-					font-size: 18px;
-					cursor: pointer;
-					transition: background 0.3s ease, transform 0.2s ease;
-					box-shadow: 0 4px 10px rgba(76, 117, 163, 0.3);
-				}
-				button:hover {
-					background: #3a5f8a;
-					transform: translateY(-2px);
-				}
-				button:disabled {
-					background: #ccc;
-					cursor: not-allowed;
-					box-shadow: none;
-				}
-				#token {
-					margin-top: 30px;
-					padding: 15px;
-					background: #e8f5e9;
-					border-radius: 8px;
-					color: #2e7d32;
-					font-family: monospace;
-					word-break: break-all;
-					box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
-				}
-				#error {
-					margin-top: 20px;
-					color: #d32f2f;
-					font-size: 14px;
-				}
-			</style>
-			<script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
-			<script>
-				let isInitialized = false;
+                VKID.Config.init({
+                    app: %s,
+                    redirectUrl: '%s',
+                    responseMode: VKID.ConfigResponseMode.Callback,
+                    source: VKID.ConfigSource.LOWCODE,
+                    scope: '', // Fill in required scopes if needed
+                    state: '%s',
+                    codeChallenge: '%s'
+                });
 
-				// Инициализация VK Bridge
-				vkBridge.send('VKWebAppInit')
-					.then(data => {
-						console.log('VK Bridge initialized:', data);
-						isInitialized = true;
-						document.getElementById('authButton').disabled = false;
-					})
-					.catch(error => {
-						console.error('Init error:', error);
-						document.getElementById('error').innerText = 'Это Mini App работает только внутри VK! Откройте через VK.';
-						document.getElementById('authButton').disabled = true;
-					});
+                const oneTap = new VKID.OneTap();
 
-				// Функция авторизации
-				function authorize() {
-					if (!isInitialized) {
-						alert('VK Bridge не инициализирован. Откройте в VK.');
-						return;
-					}
-					vkBridge.send('VKWebAppGetAuthToken', {
-						app_id: ` + appID + `,
-						scope: '` + scope + `'
-					})
-					.then(data => {
-						if (data.access_token) {
-							// Отправляем токен на сервер
-							sendTokenToServer(data.access_token);
-						}
-					})
-					.catch(error => {
-						console.error('Auth error:', error);
-						alert('Ошибка авторизации: ' + JSON.stringify(error));
-					});
-				}
+                oneTap.render({
+                    container: document.currentScript.parentElement,
+                    showAlternativeLogin: true
+                })
+                .on(VKID.WidgetEvents.ERROR, vkidOnError)
+                .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, function (payload) {
+                    fetch('/auth', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            code: payload.code,
+                            device_id: payload.device_id,
+                            state: '%s'
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        console.log('Success:', data);
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    });
+                });
+              
+                function vkidOnError(error) {
+                    console.error('VKID Error:', error);
+                }
+            }
+        </script>
+    </div>
+</body>
+</html>
+`, clientID, redirectURI, state, challenge, state)
 
-				// Функция отправки токена на сервер
-				function sendTokenToServer(token) {
-					fetch('/receive-token', {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json',
-						},
-						body: JSON.stringify({ token: token })
-					})
-					.then(response => response.json())
-					.then(data => {
-						if (data.success) {
-							// Показываем сообщение о передаче токена
-							document.getElementById('token').innerText = 'токен передан';
-						} else {
-							document.getElementById('error').innerText = 'Ошибка при передаче токена';
-						}
-					})
-					.catch(error => {
-						console.error('Ошибка при отправке токена:', error);
-						document.getElementById('error').innerText = 'Ошибка при передаче токена';
-					});
-				}
-			</script>
-		</head>
-		<body>
-			<div class="container">
-				<h1>VK Mini App</h1>
-				<button id="authButton" onclick="authorize()" disabled>Авторизоваться в VK</button>
-				<div id="token"></div>
-				<div id="error"></div>
-			</div>
-		</body>
-		</html>
-		`
-		fmt.Fprint(w, html)
-	})
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(html))
+}
 
-	// Пути к сертификатам (адаптировано под testiq/ssl)
-	certFile := "/etc/ssl/rassilkiin/fullchain.pem"
-	keyFile := "/etc/ssl/rassilkiin/privkey.pem"
+func handleAuth(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-	// Запуск на HTTPS :443
-	log.Println("Сервер запущен на HTTPS :443")
-	log.Fatal(http.ListenAndServeTLS(":443", certFile, keyFile, nil))
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	var data struct {
+		Code     string `json:"code"`
+		DeviceID string `json:"device_id"`
+		State    string `json:"state"`
+	}
+	err = json.Unmarshal(body, &data)
+	if err != nil {
+		http.Error(w, "Bad request", http.StatusBadRequest)
+		return
+	}
+
+	verifAny, ok := store.LoadAndDelete(data.State)
+	if !ok {
+		http.Error(w, "Invalid state", http.StatusBadRequest)
+		return
+	}
+	verifier := verifAny.(string)
+
+	// Exchange code for token
+	form := url.Values{}
+	form.Add("grant_type", "authorization_code")
+	form.Add("code", data.Code)
+	form.Add("device_id", data.DeviceID)
+	form.Add("client_id", clientID)
+	form.Add("client_secret", clientSecret)
+	form.Add("redirect_uri", redirectURI)
+	form.Add("code_verifier", verifier)
+
+	client := &http.Client{}
+	req, err := http.NewRequest("POST", "https://id.vk.com/oauth2/auth", strings.NewReader(form.Encode()))
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	var tokenResp struct {
+		AccessToken string `json:"access_token"`
+		// Add other fields if needed
+	}
+	err = json.Unmarshal(respBody, &tokenResp)
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	if tokenResp.AccessToken != "" {
+		log.Printf("Access Token: %s\n", tokenResp.AccessToken)
+	} else {
+		log.Println("Failed to get access token")
+	}
+
+	jsonResp, err := json.Marshal(map[string]string{"status": "success"})
+	if err != nil {
+		http.Error(w, "Internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(jsonResp)
+}
+
+func generateVerifier() (string, error) {
+	buf := make([]byte, 32)
+	_, err := rand.Read(buf)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(buf), nil
+}
+
+func computeChallenge(verifier string) string {
+	h := sha256.New()
+	h.Write([]byte(verifier))
+	return base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+}
+
+func generateState() (string, error) {
+	buf := make([]byte, 16)
+	_, err := rand.Read(buf)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
