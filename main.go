@@ -35,8 +35,8 @@ func main() {
 	clientID = os.Getenv("VK_CLIENT_ID")
 	clientSecret = os.Getenv("VK_CLIENT_SECRET")
 	redirectURI = os.Getenv("VK_REDIRECT_URI")
-	certFile = os.Getenv("CERTFILE")
-	keyFile = os.Getenv("KEYFILE")
+	certFile = os.Getenv("SSL_CERT_FILE")
+	keyFile = os.Getenv("SSL_KEY_FILE")
 
 	fmt.Println(certFile)
 	fmt.Println(keyFile)
