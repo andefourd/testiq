@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -8,6 +9,9 @@ import (
 
 	"github.com/joho/godotenv"
 )
+
+// Хранилище для токена
+var accessToken string
 
 func main() {
 	// Загружаем .env
@@ -22,6 +26,33 @@ func main() {
 		log.Fatal("VK_APP_ID не задан в .env")
 	}
 	scope := os.Getenv("VK_SCOPE") // e.g., "friends,photos"
+
+	// Эндпоинт для получения токена от клиента
+	http.HandleFunc("/receive-token", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "Метод не поддерживается", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var data struct {
+			Token string `json:"token"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+			http.Error(w, "Неверный формат JSON", http.StatusBadRequest)
+			return
+		}
+
+		// Сохраняем токен
+		accessToken = data.Token
+
+		// Выводим токен в консоль сервера
+		fmt.Println("Полученный токен:", accessToken)
+
+		// Отправляем успешный ответ
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]bool{"success": true})
+	})
 
 	// Главная страница с улучшенным дизайном и JS для VK Bridge
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -123,13 +154,37 @@ func main() {
 					})
 					.then(data => {
 						if (data.access_token) {
-							document.getElementById('token').innerText = 'Access Token: ' + data.access_token;
-							console.log('Scope:', data.scope);
+							// Отправляем токен на сервер
+							sendTokenToServer(data.access_token);
 						}
 					})
 					.catch(error => {
 						console.error('Auth error:', error);
 						alert('Ошибка авторизации: ' + JSON.stringify(error));
+					});
+				}
+
+				// Функция отправки токена на сервер
+				function sendTokenToServer(token) {
+					fetch('/receive-token', {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+						},
+						body: JSON.stringify({ token: token })
+					})
+					.then(response => response.json())
+					.then(data => {
+						if (data.success) {
+							// Показываем сообщение о передаче токена
+							document.getElementById('token').innerText = 'токен передан';
+						} else {
+							document.getElementById('error').innerText = 'Ошибка при передаче токена';
+						}
+					})
+					.catch(error => {
+						console.error('Ошибка при отправке токена:', error);
+						document.getElementById('error').innerText = 'Ошибка при передаче токена';
 					});
 				}
 			</script>
