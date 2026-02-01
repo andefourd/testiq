@@ -75,9 +75,8 @@ func main() {
 		fmt.Fprint(w, html)
 	})
 
-	// Пути к сертификатам (относительно корня репо)
-	certFile := "./ssl/fullchain.pem"
-	keyFile := "./ssl/privkey.pem"
+	certFile := "/etc/ssl/rassilkiin/fullchain.pem"
+	keyFile := "/etc/ssl/rassilkiin/privkey.pem"
 
 	// Запуск на HTTPS :443
 	log.Println("Сервер запущен на HTTPS :443")
