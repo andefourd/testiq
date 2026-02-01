@@ -1,2 +1,12 @@
-# Игнорировать .env файлы
+# SSL папка с сертификатами
+ssl/
+
+# Файлы сертификатов (для перестраховки)
+*.crt
+*.pem
+*.key
+
+# Environment files
 .env
+.env.local
+.env.*.local

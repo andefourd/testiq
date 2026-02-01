@@ -29,14 +29,17 @@ var (
 func main() {
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		log.Fatalf("Error loading .env file: %v", err)
 	}
 
 	clientID = os.Getenv("VK_CLIENT_ID")
 	clientSecret = os.Getenv("VK_CLIENT_SECRET")
 	redirectURI = os.Getenv("VK_REDIRECT_URI")
-	certFile = os.Getenv("SSL_CERT_FILE")
-	keyFile = os.Getenv("SSL_KEY_FILE")
+	certFile = os.Getenv("CERTFILE")
+	keyFile = os.Getenv("KEYFILE")
+
+	fmt.Println(certFile)
+	fmt.Println(keyFile)
 
 	if clientID == "" || clientSecret == "" || redirectURI == "" || certFile == "" || keyFile == "" {
 		log.Fatal("Missing required environment variables")
