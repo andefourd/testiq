@@ -75,7 +75,7 @@ func main() {
 		fmt.Fprint(w, html)
 	})
 
-	// Пути к сертификатам (относительно корня проекта testiq)
+	// Пути к сертификатам (относительно корня репо)
 	certFile := "./ssl/fullchain.pem"
 	keyFile := "./ssl/privkey.pem"
 
