@@ -75,9 +75,9 @@ func main() {
 		fmt.Fprint(w, html)
 	})
 
-	// Пути к сертификатам (уточните, если private_key.crt не ключ)
-	certFile := "/etc/ssl/rassilkiin.ru/fullchain.pem"
-	keyFile := "/etc/ssl/rassilkiin.ru/private_key.crt"
+	// Пути к сертификатам (относительно корня проекта testiq)
+	certFile := "./ssl/fullchain.pem"
+	keyFile := "./ssl/privkey.pem"
 
 	// Запуск на HTTPS :443
 	log.Println("Сервер запущен на HTTPS :443")
