@@ -55,27 +55,22 @@ func main() {
 }
 
 func servePage(w http.ResponseWriter, r *http.Request) {
-	// Generate code_verifier
 	verifier, err := generateVerifier()
 	if err != nil {
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return
 	}
 
-	// Compute code_challenge
 	challenge := computeChallenge(verifier)
 
-	// Generate state
 	state, err := generateState()
 	if err != nil {
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return
 	}
 
-	// Store verifier with state
 	store.Store(state, verifier)
 
-	// HTML with embedded state and challenge
 	html := fmt.Sprintf(`
 <!DOCTYPE html>
 <html>
@@ -138,7 +133,9 @@ func servePage(w http.ResponseWriter, r *http.Request) {
 `, clientID, redirectURI, state, challenge, state)
 
 	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(html))
+	if _, err := w.Write([]byte(html)); err != nil {
+		log.Printf("Failed to write response: %v", err)
+	}
 }
 
 func handleAuth(w http.ResponseWriter, r *http.Request) {
@@ -171,7 +168,6 @@ func handleAuth(w http.ResponseWriter, r *http.Request) {
 	}
 	verifier := verifAny.(string)
 
-	// Exchange code for token
 	form := url.Values{}
 	form.Add("grant_type", "authorization_code")
 	form.Add("code", data.Code)
@@ -194,7 +190,9 @@ func handleAuth(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal error", http.StatusInternalServerError)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -204,7 +202,6 @@ func handleAuth(w http.ResponseWriter, r *http.Request) {
 
 	var tokenResp struct {
 		AccessToken string `json:"access_token"`
-		// Add other fields if needed
 	}
 	err = json.Unmarshal(respBody, &tokenResp)
 	if err != nil {
@@ -225,7 +222,9 @@ func handleAuth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Write(jsonResp)
+	if _, err := w.Write(jsonResp); err != nil {
+		log.Printf("Failed to write JSON response: %v", err)
+	}
 }
 
 func generateVerifier() (string, error) {
